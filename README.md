@@ -46,6 +46,12 @@ Never commit real API keys, signing keys, APK files, generated build outputs, or
 
 For release builds, create and store your own Android signing key outside the repository. Future app updates must be signed with the same key.
 
+## Releases
+
+Current stable release: **RouteVerge 2.0.0** (`versionName` 2.0.0, `versionCode` 20, tag `v2.0.0`).
+
+Signed release APKs are published on the [Releases page](https://github.com/ZekTy/qunide-campus-run/releases). The APK filename is `CampusRunnerNfc-release.apk`; the in-app update check reads the latest GitHub release and compares the tag version against the installed `versionName`.
+
 ## License
 
 GPL-3.0. See `LICENSE`.
