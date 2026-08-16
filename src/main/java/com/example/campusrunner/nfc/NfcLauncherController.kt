@@ -1,7 +1,9 @@
 package com.example.campusrunner.nfc
 
 import android.app.Activity
-import android.app.AlertDialog
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -17,13 +19,6 @@ import android.nfc.Tag
 import android.nfc.tech.Ndef
 import android.os.Build
 import android.provider.Settings
-import android.text.InputType
-import android.view.ViewGroup
-import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
 import com.example.campusrunner.BuildConfig
 import org.json.JSONObject
@@ -49,11 +44,20 @@ class NfcLauncherController(
     private val nfcAdapter: NfcAdapter? = NfcAdapter.getDefaultAdapter(activity)
     val deviceId: String = getOrCreateDeviceId()
 
-    private var nfcDialog: AlertDialog? = null
-    private var activationDialog: AlertDialog? = null
+    // Compose-rendered dialog state (NfcLauncherController no longer builds Views).
+    var activationDialogVisible by mutableStateOf(false)
+        private set
+    var linkDialogVisible by mutableStateOf(false)
+        private set
+    var linkDialogUrl by mutableStateOf("")
+        private set
+    var currentLinkDialogVisible by mutableStateOf(false)
+        private set
     private var lastNfcToastAt = 0L
     @Volatile
     private var activationCheckRunning = false
+    @Volatile
+    private var redeemInFlight = false
 
     val isActivated: Boolean
         get() = prefs.getBoolean(KEY_ACTIVATION_VERIFIED, false)
@@ -100,13 +104,7 @@ class NfcLauncherController(
     }
 
     fun showCurrentLinkDialog() {
-        val url = getSavedOrDefaultUrl()
-        AlertDialog.Builder(activity)
-            .setTitle("当前 NFC 链接")
-            .setMessage(url)
-            .setPositiveButton("复制") { _, _ -> copyLink(url) }
-            .setNegativeButton("关闭", null)
-            .show()
+        currentLinkDialogVisible = true
     }
 
     fun saveLink(url: String) {
@@ -130,117 +128,12 @@ class NfcLauncherController(
 
     fun showActivationDialog() {
         if (activity.isFinishing || isActivated) return
-        if (activationDialog?.isShowing == true) return
+        if (activationDialogVisible) return
+        activationDialogVisible = true
+    }
 
-        val padding = dp(20)
-        var hasReadAgreement = false
-        val container = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, 0)
-        }
-        val message = TextView(activity).apply {
-            text = "这台设备还没有绑定。请先通过 Telegram 完成验证，或输入管理员给你的激活码。"
-            textSize = 14f
-            setLineSpacing(dp(2).toFloat(), 1f)
-        }
-        val terms = TextView(activity).apply {
-            text = SOFTWARE_AGREEMENT
-            textSize = 12f
-            setTextColor(0xFF64748B.toInt())
-            setLineSpacing(dp(2).toFloat(), 1f)
-        }
-        val agreementCheck = CheckBox(activity).apply {
-            text = "请先完整阅读协议"
-            textSize = 13f
-            isEnabled = false
-            setPadding(0, dp(8), 0, dp(4))
-        }
-        val termsScroll = ScrollView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(260)
-            )
-            addView(
-                terms,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-        val deviceView = TextView(activity).apply {
-            text = "设备 ID: $deviceId"
-            textSize = 12f
-            setTextIsSelectable(true)
-        }
-        val codeInput = EditText(activity).apply {
-            hint = "输入验证码或激活码"
-            isSingleLine = true
-            textSize = 16f
-            inputType = InputType.TYPE_CLASS_TEXT or
-                    InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or
-                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-        }
-        container.addView(message)
-        container.addView(termsScroll)
-        container.addView(agreementCheck)
-        container.addView(deviceView)
-        container.addView(codeInput)
-
-        activationDialog = AlertDialog.Builder(activity)
-            .setTitle("设备验证")
-            .setView(container)
-            .setPositiveButton("激活", null)
-            .setNegativeButton("Telegram 验证", null)
-            .setCancelable(false)
-            .create()
-            .apply {
-                setCanceledOnTouchOutside(false)
-        }
-
-        activationDialog?.setOnShowListener {
-            val activateButton = activationDialog?.getButton(AlertDialog.BUTTON_POSITIVE)
-            val telegramButton = activationDialog?.getButton(AlertDialog.BUTTON_NEGATIVE)
-            fun updateActionButtons() {
-                val canContinue = agreementCheck.isChecked
-                activateButton?.isEnabled = canContinue
-                telegramButton?.isEnabled = canContinue
-            }
-            fun markAgreementReadIfNeeded() {
-                val child = termsScroll.getChildAt(0) ?: return
-                val reachedBottom = termsScroll.scrollY + termsScroll.height >= child.height - dp(4)
-                if (reachedBottom && !hasReadAgreement) {
-                    hasReadAgreement = true
-                    agreementCheck.isEnabled = true
-                    agreementCheck.text = "我已完整阅读并同意《软件使用协议与免责声明》"
-                }
-            }
-            termsScroll.setOnScrollChangeListener { _, _, _, _, _ -> markAgreementReadIfNeeded() }
-            termsScroll.post { markAgreementReadIfNeeded() }
-            agreementCheck.setOnCheckedChangeListener { _, _ -> updateActionButtons() }
-            updateActionButtons()
-
-            activateButton?.setOnClickListener {
-                if (!agreementCheck.isChecked) {
-                    toast("请先完整阅读并勾选同意协议")
-                    return@setOnClickListener
-                }
-                val code = codeInput.text.toString().trim()
-                if (code.isEmpty()) {
-                    toast("请输入验证码或激活码")
-                } else {
-                    redeemActivationCode(code)
-                }
-            }
-            telegramButton?.setOnClickListener {
-                if (!agreementCheck.isChecked) {
-                    toast("请先完整阅读并勾选同意协议")
-                    return@setOnClickListener
-                }
-                openTelegramVerification()
-            }
-        }
-        activationDialog?.show()
+    fun dismissActivationDialog() {
+        activationDialogVisible = false
     }
 
     fun ensureActivated(): Boolean {
@@ -329,18 +222,20 @@ class NfcLauncherController(
     }
 
     private fun showNfcLinkDialog(url: String) {
-        if (nfcDialog?.isShowing == true) return
-
-        nfcDialog = AlertDialog.Builder(activity)
-            .setTitle("发现 NFC 链接")
-            .setMessage(url)
-            .setPositiveButton("保存") { _, _ -> saveDiscoveredUrl(url) }
-            .setNeutralButton("复制") { _, _ -> copyLink(url) }
-            .setNegativeButton("取消", null)
-            .show()
+        if (linkDialogVisible) return
+        linkDialogUrl = url
+        linkDialogVisible = true
     }
 
-    private fun saveDiscoveredUrl(url: String) {
+    fun dismissLinkDialog() {
+        linkDialogVisible = false
+    }
+
+    fun dismissCurrentLinkDialog() {
+        currentLinkDialogVisible = false
+    }
+
+    fun saveDiscoveredUrl(url: String) {
         prefs.edit().putString(KEY_NFC_URL, url).apply()
         onStateChanged()
         toast("新链接已保存")
@@ -362,7 +257,7 @@ class NfcLauncherController(
         }
     }
 
-    private fun openTelegramVerification() {
+    fun openTelegramVerification() {
         var bot = BuildConfig.TELEGRAM_BOT_USERNAME.trim()
         if (bot.isEmpty() || bot == "your_bot_username") {
             toast("请先在 gradle.properties 配置 telegramBotUsername")
@@ -375,7 +270,10 @@ class NfcLauncherController(
         activity.startActivity(Intent(Intent.ACTION_VIEW, uri))
     }
 
-    private fun redeemActivationCode(code: String) {
+    fun redeemActivationCode(code: String, onFinished: (() -> Unit)? = null) {
+        // Minimal in-flight guard: prevents parallel redemption requests.
+        if (redeemInFlight) return
+        redeemInFlight = true
         toast("正在校验激活码...")
         Thread {
             try {
@@ -387,7 +285,7 @@ class NfcLauncherController(
                 if (response.optBoolean("ok", false)) {
                     markActivated(response.optString("verifiedAt", ""))
                     activity.runOnUiThread {
-                        activationDialog?.dismiss()
+                        dismissActivationDialog()
                         enableNfcReaderMode()
                         onStateChanged()
                         toast("激活成功")
@@ -397,7 +295,13 @@ class NfcLauncherController(
                     activity.runOnUiThread { toast(message) }
                 }
             } catch (e: Exception) {
-                activity.runOnUiThread { toast("网络校验失败: ${readableError(e)}") }
+                android.util.Log.w("NfcActivation", "redeem activation failed", e)
+                activity.runOnUiThread { toast("设备验证失败，请稍后重试。") }
+            } finally {
+                activity.runOnUiThread {
+                    redeemInFlight = false
+                    onFinished?.invoke()
+                }
             }
         }.start()
     }
@@ -418,7 +322,7 @@ class NfcLauncherController(
                     markActivated(response.optString("verifiedAt", ""))
                     activity.runOnUiThread {
                         enableNfcReaderMode()
-                        activationDialog?.dismiss()
+                        dismissActivationDialog()
                         onStateChanged()
                     }
                 } else {
@@ -432,6 +336,7 @@ class NfcLauncherController(
                     }
                 }
             } catch (e: Exception) {
+                android.util.Log.w("NfcVerification", "activation status check failed", e)
                 if (clearOnNetworkFailure) {
                     clearActivation()
                 }
@@ -440,7 +345,7 @@ class NfcLauncherController(
                     if (!isActivated && showDialogWhenMissing) {
                         disableNfcReaderMode()
                         showActivationDialog()
-                        toast("网络校验失败: ${readableError(e)}")
+                        toast("设备验证失败，请稍后重试。")
                     }
                 }
             } finally {
@@ -525,10 +430,6 @@ class NfcLauncherController(
         }
     }
 
-    private fun readableError(e: Exception): String {
-        return e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-    }
-
     private fun getOrCreateDeviceId(): String {
         val savedDeviceId = prefs.getString(KEY_DEVICE_ID, "").orEmpty()
         if (savedDeviceId.isNotBlank()) return savedDeviceId
@@ -550,7 +451,7 @@ class NfcLauncherController(
         }
     }
 
-    private fun copyLink(url: String) {
+    fun copyLink(url: String) {
         val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         clipboard?.setPrimaryClip(ClipData.newPlainText("NFC 链接", url))
         toast("链接已复制")
@@ -584,10 +485,6 @@ class NfcLauncherController(
 
     private fun toast(message: String) {
         Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun dp(value: Int): Int {
-        return (value * activity.resources.displayMetrics.density).toInt()
     }
 
     companion object {

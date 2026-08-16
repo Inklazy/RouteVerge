@@ -27,6 +27,13 @@ def googleMapsApiKey = configValue("GOOGLE_MAPS_API_KEY")
 def activationBaseUrl = project.findProperty("activationBaseUrl") ?: "https://your-worker.example.workers.dev"
 def telegramBotUsername = project.findProperty("telegramBotUsername") ?: "your_bot_username"
 
+// Release signing identity — values come from env vars or local.properties
+// (both ignored by git). No secrets are ever hard-coded in source.
+def releaseStoreFile = configValue("RELEASE_STORE_FILE")
+def releaseStorePassword = configValue("RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = configValue("RELEASE_KEY_ALIAS")
+def releaseKeyPassword = configValue("RELEASE_KEY_PASSWORD")
+
 android {
     namespace "com.example.campusrunner"
     compileSdk 35
@@ -54,11 +61,25 @@ android {
         compose true
     }
 
+    signingConfigs {
+        if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            if (releaseStoreFile) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

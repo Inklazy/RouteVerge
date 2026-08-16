@@ -1,3 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RouteVerge</string>
+
+    <!-- NFC dialogs (Phase 4B) -->
+    <string name="nfc_dialog_activation_title">设备验证</string>
+    <string name="nfc_dialog_activation_message">这台设备还没有绑定。请先通过 Telegram 完成验证，或输入管理员给你的激活码。</string>
+    <string name="nfc_dialog_agreement_pending">请先完整阅读协议</string>
+    <string name="nfc_dialog_agreement_accepted">我已完整阅读并同意《软件使用协议与免责声明》</string>
+    <string name="nfc_dialog_device_id">设备 ID: %1$s</string>
+    <string name="nfc_dialog_code_hint">输入验证码或激活码</string>
+    <string name="nfc_dialog_code_empty">请输入验证码或激活码</string>
+    <string name="nfc_dialog_activate">激活</string>
+    <string name="nfc_dialog_telegram">Telegram 验证</string>
+    <string name="nfc_link_dialog_title">发现 NFC 链接</string>
+    <string name="nfc_link_dialog_save">保存</string>
+    <string name="nfc_link_dialog_copy">复制</string>
+    <string name="nfc_link_dialog_cancel">取消</string>
+    <string name="current_nfc_link_dialog_title">当前 NFC 链接</string>
+    <string name="current_nfc_link_dialog_close">关闭</string>
+
+    <!-- Settings (Phase 9B) -->
+    <string name="settings_title">设置</string>
+    <string name="settings_back">返回</string>
+    <string name="settings_section_nfc">NFC</string>
+    <string name="settings_device_verification">设备验证</string>
+    <string name="settings_verified">已验证</string>
+    <string name="settings_not_verified">未验证</string>
+    <string name="settings_current_nfc_link">当前 NFC 链接</string>
+    <string name="settings_nfc_link_configured">已配置</string>
+    <string name="settings_nfc_link_not_configured">未配置</string>
+    <string name="settings_section_app">App</string>
+    <string name="settings_about">关于 RouteVerge</string>
+    <string name="settings_about_description">Android 位置模拟与路线工具。</string>
+    <string name="settings_version">版本</string>
+    <string name="settings_license">许可证</string>
+    <string name="settings_project_home">项目主页</string>
+    <string name="settings_project_home_url">https://github.com/ZekTy/qunide-campus-run</string>
 </resources>

@@ -1,5 +1,8 @@
-package com.example.campusrunner.ui
+package com.example.campusrunner.ui.map
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Point
 import android.os.Bundle
 import androidx.compose.runtime.Composable
@@ -23,6 +26,7 @@ import com.example.campusrunner.BuildConfig
 import com.example.campusrunner.data.MapProvider
 import com.example.campusrunner.data.RoutePoint
 import com.example.campusrunner.geo.CoordinateUtils
+import com.example.campusrunner.ui.theme.RouteVergeBrand
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView as GoogleMapView
 import com.google.android.gms.maps.CameraUpdateFactory as GoogleCameraUpdateFactory
@@ -32,7 +36,7 @@ import com.google.android.gms.maps.model.MarkerOptions as GoogleMarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions as GooglePolylineOptions
 import java.util.Locale
 
-enum class MarkerKind { START, END, CURRENT, NORMAL }
+enum class MarkerKind { START, END, CURRENT, NORMAL, CLOSED_ORIGIN }
 
 interface MapMarkerHandle {
     fun setPosition(point: RoutePoint)
@@ -176,7 +180,8 @@ private class AMapController(private val map: AMap) : MapController {
             AMapMarkerOptions()
                 .position(AMapLatLng(gcj.lat, gcj.lng))
                 .title(title)
-                .icon(BitmapDescriptorFactory.defaultMarker(markerHue(kind)))
+                .icon(markerIcon(kind))
+                .anchor(0.5f, 0.5f)
         )
         return object : MapMarkerHandle {
             override fun setPosition(point: RoutePoint) {
@@ -241,12 +246,8 @@ private class AMapController(private val map: AMap) : MapController {
         map.mapType = if (enabled) AMap.MAP_TYPE_SATELLITE else AMap.MAP_TYPE_NORMAL
     }
 
-    private fun markerHue(kind: MarkerKind): Float = when (kind) {
-        MarkerKind.START -> BitmapDescriptorFactory.HUE_GREEN
-        MarkerKind.END -> BitmapDescriptorFactory.HUE_RED
-        MarkerKind.CURRENT -> BitmapDescriptorFactory.HUE_ORANGE
-        MarkerKind.NORMAL -> BitmapDescriptorFactory.HUE_AZURE
-    }
+    private fun markerIcon(kind: MarkerKind) =
+        BitmapDescriptorFactory.fromBitmap(createDotBitmap(markerDotColor(kind)))
 }
 
 private class GoogleController(private val map: GoogleMap) : MapController {
@@ -259,7 +260,8 @@ private class GoogleController(private val map: GoogleMap) : MapController {
             GoogleMarkerOptions()
                 .position(GoogleLatLng(point.latWgs84, point.lngWgs84))
                 .title(title)
-                .icon(GoogleBitmapDescriptorFactory.defaultMarker(markerHue(kind)))
+                .icon(GoogleBitmapDescriptorFactory.fromBitmap(createDotBitmap(markerDotColor(kind))))
+                .anchor(0.5f, 0.5f)
         )
         return object : MapMarkerHandle {
             override fun setPosition(point: RoutePoint) {
@@ -315,11 +317,33 @@ private class GoogleController(private val map: GoogleMap) : MapController {
     override fun setSatelliteEnabled(enabled: Boolean) {
         map.mapType = if (enabled) GoogleMap.MAP_TYPE_SATELLITE else GoogleMap.MAP_TYPE_NORMAL
     }
+}
 
-    private fun markerHue(kind: MarkerKind): Float = when (kind) {
-        MarkerKind.START -> GoogleBitmapDescriptorFactory.HUE_GREEN
-        MarkerKind.END -> GoogleBitmapDescriptorFactory.HUE_RED
-        MarkerKind.CURRENT -> GoogleBitmapDescriptorFactory.HUE_ORANGE
-        MarkerKind.NORMAL -> GoogleBitmapDescriptorFactory.HUE_AZURE
-    }
+// ===== Shared compact marker rendering (cross-provider consistent) =====
+// RouteVerge own marker semantics: small filled dots instead of SDK default pins.
+private fun markerDotColor(kind: MarkerKind): Int = when (kind) {
+    MarkerKind.START, MarkerKind.CLOSED_ORIGIN ->
+        android.graphics.Color.parseColor(RouteVergeBrand.SuccessHex)
+    MarkerKind.END -> android.graphics.Color.parseColor(RouteVergeBrand.DangerHex)
+    MarkerKind.CURRENT, MarkerKind.NORMAL ->
+        android.graphics.Color.parseColor(RouteVergeBrand.PrimaryHex)
+}
+
+private fun createDotBitmap(color: Int): Bitmap {
+    val size = dotSizePx()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = size / 2f
+    val radius = size / 2f
+    val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = android.graphics.Color.WHITE }
+    val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+    canvas.drawCircle(center, center, radius, border)
+    canvas.drawCircle(center, center, radius * 0.7f, dot)
+    return bitmap
+}
+
+private fun dotSizePx(): Int {
+    // ~24dp compact marker, density-aware for cross-device consistency.
+    val density = android.content.res.Resources.getSystem().displayMetrics.density
+    return (24 * density).toInt()
 }
