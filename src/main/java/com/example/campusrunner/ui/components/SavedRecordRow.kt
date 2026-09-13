@@ -82,7 +82,7 @@ fun SavedRecordRow(
             tonalElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(76.dp)
+                .height(68.dp)
                 .clickable(onClick = onSelect)
                 .semantics {
                     this.selected = selected

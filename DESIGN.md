@@ -63,12 +63,15 @@ Use tabular numerals for coordinates, distances, speeds, and counts where availa
 - Status card: warm soft surface, 16–20dp radius, 16dp internal padding, trailing badge that does not move the description.
 - Mode selector: full-width warm segmented surface, 52dp minimum height. Selected item animates to `surface-strong`, uses dark ink and a check icon; inactive item stays on the canvas.
 - Map preview: reused map instance, full available width, 220dp home preview, 20dp radius, 1dp hairline, no filter or heavy shadow.
+- During a running route, the preview adds one semantic current-position marker derived from the persisted active route clock; the base map and route geometry remain unchanged.
+- Point coordinates: keep the two-column layout with 56dp text-field height and compact vertical rhythm; never reduce type size to compress it.
+- Route speed presets: keep all four controls in one row at a shared 56dp height; reduce container spacing rather than changing calculations or type scale.
 - Primary buttons: 48dp minimum height, pill radius, coral fill, white label.
 - Secondary buttons: same dimensions and stable placement, canvas fill, dark ink, 1dp hairline.
 
 ## Saved records
 
-Point and route history use `SavedRecordRow` with the type-safe `PointRecord` and `RouteRecord` models. Both rows are 76dp high with the same horizontal padding (16dp), medium radius (12dp), hairline, selected surface, press feedback, vertical alignment, and trailing overflow target. Stable record IDs are used as Compose keys.
+Point and route history use `SavedRecordRow` with the type-safe `PointRecord` and `RouteRecord` models. Both rows are 68dp high with the same horizontal padding (16dp), medium radius (12dp), hairline, selected surface, press feedback, vertical alignment, and trailing overflow target. Stable record IDs are used as Compose keys. Adjacent rows use a 4dp gap without collapsing into one surface.
 
 - Point records show only the point name and coordinate subtitle. If metadata is unavailable, the subtitle line is reserved so the row does not shrink.
 - Route records show route summary fields such as distance, point count, and loop mode.
@@ -84,6 +87,14 @@ Running | `暂停模拟` (secondary) + `停止模拟` (primary) | `停止模拟`
 Paused | `继续模拟` (secondary) + `停止模拟` (primary) | Not applicable
 
 The two route columns keep their width, height, and gap in every state. Pausing retains the current route position; resuming never restarts at the beginning.
+
+## Fixed NFC tool bar
+
+The Alipay NFC row is the `Scaffold.bottomBar`, not a `LazyColumn` item. It uses an opaque warm surface, a hairline, `navigationBarsPadding()` and `imePadding()`, so it stays visible while records scroll and remains above gesture/navigation insets. The scrollable content receives Scaffold's measured bottom-bar inset plus 32dp extra content padding, keeping the last record tappable and unobscured. Point and route modes share this same bottom bar.
+
+## Background simulation and recovery
+
+Simulation runs in the existing `MockLocationService` foreground service (`foregroundServiceType="location"`). It owns one coroutine `Job`, mock providers, WakeLock, notification channel, and stop action; Composables do not own the loop. Session configuration and active elapsed time are persisted in `mock_location_session` preferences on start and during each tick. `START_REDELIVER_INTENT`/`START_STICKY` restoration rebuilds point or route mode, preserves pause state and derives the route position from persisted active elapsed time. `MainActivity` reads the same snapshot on resume, so buttons, status, route metadata, and map configuration recover after Alipay, task switching, lock/unlock, or activity recreation. Stopping clears preferences, cancels the job, removes providers, releases WakeLock, and removes the foreground notification.
 
 ## Tools and accessibility
 

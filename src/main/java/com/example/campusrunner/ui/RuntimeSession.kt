@@ -14,8 +14,8 @@ enum class RuntimeSessionKind { POINT, ROUTE }
  * It is NOT authoritative runtime state: whether the UI shows running/paused
  * always comes from the service chain (MockLocationService ->
  * MainActivity.refreshState() -> isRunning / isPaused). This session object is
- * created when a simulation starts, kept across pause/resume, and cleared on
- * stop or activity recreation.
+ * created when a simulation starts, kept across pause/resume, and reconstructed
+ * from the foreground service's persisted session when the activity returns.
  */
 data class RuntimeSession(
     val kind: RuntimeSessionKind,
@@ -26,7 +26,9 @@ data class RuntimeSession(
     val speedMps: Double? = null,
     val closeLoop: Boolean = false,
     val loopCount: Int = 1,
-    val totalDistanceMeters: Double? = null
+    val totalDistanceMeters: Double? = null,
+    /** Active route clock (paused time excluded), persisted by the service. */
+    val activeElapsedMillis: Long = 0L
 )
 
 /**
@@ -48,7 +50,7 @@ fun runtimeSummary(isRunning: Boolean, isPaused: Boolean, session: RuntimeSessio
     if (!isRunning && !isPaused) return null
     val status = if (isPaused) "模拟暂停" else "模拟运行中"
     val what = when (session?.kind) {
-        RuntimeSessionKind.ROUTE -> routeDisplayName(session?.routeName)
+        RuntimeSessionKind.ROUTE -> routeDisplayName(session.routeName)
         RuntimeSessionKind.POINT -> "定点模拟"
         null -> "当前会话"
     }

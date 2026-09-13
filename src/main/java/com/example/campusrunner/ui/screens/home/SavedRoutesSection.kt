@@ -37,7 +37,7 @@ fun SavedRoutesSection(
     onDeleteRoute: (SavedRoute) -> Unit,
     onSelectRoute: (SavedRoute) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)) {
         HomeSectionTitle("保存路线", count = routes.size)
         if (routes.isEmpty()) {
             EmptyRoutesHint()

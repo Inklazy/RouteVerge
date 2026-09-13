@@ -31,6 +31,7 @@ import com.example.campusrunner.data.UserSettings
 import com.example.campusrunner.geo.RouteMath
 import com.example.campusrunner.nfc.NfcLauncherController
 import com.example.campusrunner.service.MockLocationService
+import com.example.campusrunner.service.MockSessionSnapshot
 import com.example.campusrunner.service.MockPermission
 import com.example.campusrunner.ui.AppRoot
 import com.example.campusrunner.ui.RuntimeSession
@@ -288,11 +289,45 @@ class MainActivity : ComponentActivity() {
     private fun refreshState() {
         hasLocationPermissionState.value = hasFineLocationPermission()
         canMockState.value = hasLocationPermissionState.value && MockPermission.canUseMockLocation(this)
-        serviceRunningState.value = MockLocationService.isRunning
-        servicePausedState.value = MockLocationService.isPaused
         routesState.value = repository.getRoutes()
         pointsState.value = pointRepository.getPoints()
+        val persistedSession = MockLocationService.readSession(this)
+        serviceRunningState.value = MockLocationService.isRunning || persistedSession != null
+        servicePausedState.value = MockLocationService.isPaused || persistedSession?.isPaused == true
+        if (persistedSession != null) {
+            runtimeSessionState.value = runtimeSessionFrom(persistedSession)
+        } else if (!MockLocationService.isRunning) {
+            runtimeSessionState.value = null
+        }
         refreshNfcState()
+    }
+
+    private fun runtimeSessionFrom(snapshot: MockSessionSnapshot): RuntimeSession? {
+        return when (snapshot.kind) {
+            "point" -> RuntimeSession(
+                kind = RuntimeSessionKind.POINT,
+                pointLat = snapshot.pointLat,
+                pointLng = snapshot.pointLng
+            )
+
+            "route" -> {
+                val route = routesState.value.firstOrNull { it.id == snapshot.routeId }
+                RuntimeSession(
+                    kind = RuntimeSessionKind.ROUTE,
+                    routeId = snapshot.routeId,
+                    routeName = snapshot.routeName,
+                    speedMps = snapshot.speedMps,
+                    closeLoop = snapshot.closeLoop,
+                    loopCount = snapshot.loopCount,
+                    totalDistanceMeters = route?.let {
+                        RouteMath.totalDistanceMeters(it.points, closeLoop = it.closeLoop)
+                    },
+                    activeElapsedMillis = snapshot.activeElapsedMillis
+                )
+            }
+
+            else -> null
+        }
     }
 
     private fun refreshNfcState() {

@@ -49,8 +49,8 @@ import com.example.campusrunner.ui.theme.RouteVergeSpacing
 private fun LazyItemScope.animateItem(): Modifier = with(this) { Modifier.animateItem() }
 
 /**
- * Home destination — a single vertical flow:
- * status -> simulation (mode + config + primary action) -> saved routes -> tools.
+ * Home destination — scrollable status/simulation/records flow with a fixed NFC
+ * tool bar owned by Scaffold.bottomBar.
  * No card stacks, no dashboard. Technical state lives in the status detail
  * (Phase 9 Settings), not on the first screen.
  */
@@ -101,6 +101,13 @@ fun HomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
+        bottomBar = {
+            NfcToolsRow(
+                isActivated = isNfcActivated,
+                onOpenAlipay = onOpenAlipayNfc,
+                onVerify = onVerifyNfc
+            )
+        },
         topBar = {
             TopAppBar(
                 title = { Text("RouteVerge") },
@@ -126,7 +133,9 @@ fun HomeScreen(
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .padding(horizontal = RouteVergeSpacing.lg),
-            contentPadding = PaddingValues(bottom = RouteVergeSpacing.xxl),
+            // Scaffold contributes the measured bottom-bar inset; this extra
+            // breathing room keeps the last record clear of the fixed toolbar.
+            contentPadding = PaddingValues(bottom = RouteVergeSpacing.xxxl),
             verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.lg)
         ) {
             item {
@@ -190,20 +199,12 @@ fun HomeScreen(
                     }) { selectedPointId = it }
                 }
             }
-            item {
-                androidx.compose.foundation.layout.Box(animateItem()) {
-                NfcToolsRow(
-                    isActivated = isNfcActivated,
-                    onOpenAlipay = onOpenAlipayNfc,
-                    onVerify = onVerifyNfc
-                ) }
-            }
         }
     }
 }
 @Composable
 private fun SavedPointsSection(points: List<SavedPoint>, selectedId: String?, onLatChange: (String) -> Unit, onLngChange: (String) -> Unit, onEdit: (SavedPoint) -> Unit, onDelete: (String) -> Unit, onSelect: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)) {
         HomeSectionTitle("保存点位", points.size)
         if (points.isEmpty()) {
             Text("暂无保存点位，请通过“地图选点”添加", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

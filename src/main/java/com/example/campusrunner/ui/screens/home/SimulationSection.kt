@@ -42,7 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.campusrunner.data.SavedRoute
 import com.example.campusrunner.data.SavedPoint
+import com.example.campusrunner.data.RoutePoint
 import com.example.campusrunner.data.MapProvider
+import com.example.campusrunner.data.PlaybackMode
 import com.example.campusrunner.data.SpeedPreset
 import com.example.campusrunner.ui.RuntimeSession
 import com.example.campusrunner.ui.RuntimeSessionKind
@@ -120,7 +122,7 @@ internal fun SimulationSection(
         val reducedMotion = rememberRouteVergeReducedMotion()
         // Keep the embedded map outside AnimatedContent: switching the mode
         // must not create two AndroidView instances or wait for map work.
-        MapPreview(provider = mapProvider, mode = mode, route = selectedRoute, point = selectedPoint, lat = pointLatInput, lng = pointLngInput)
+        MapPreview(provider = mapProvider, mode = mode, route = selectedRoute, point = selectedPoint, lat = pointLatInput, lng = pointLngInput, runtimeSession = runtimeSession)
         AnimatedContent(
             targetState = mode,
             transitionSpec = {
@@ -216,7 +218,8 @@ private fun MapPreview(
     route: SavedRoute?,
     point: SavedPoint?,
     lat: String,
-    lng: String
+    lng: String,
+    runtimeSession: RuntimeSession?
 ) {
     var controller by remember { mutableStateOf<MapController?>(null) }
     var markerHandle by remember { mutableStateOf<com.example.campusrunner.ui.map.MapMarkerHandle?>(null) }
@@ -235,7 +238,8 @@ private fun MapPreview(
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RouteVergeShapes.extraLarge)
     ) {
         CampusMapView(provider, Modifier.fillMaxWidth().height(220.dp)) { c -> controller = c; c.disableUiControls() }
-        LaunchedEffect(controller, mode, route?.id, point?.id, lat, lng) {
+        val routeProgressKey = runtimeSession?.takeIf { it.kind == RuntimeSessionKind.ROUTE }?.activeElapsedMillis
+        LaunchedEffect(controller, mode, route?.id, point?.id, lat, lng, routeProgressKey) {
             val c = controller ?: return@LaunchedEffect
             // Let the selector commit its frame first; SDK drawing work is
             // intentionally deferred so it cannot hold up the check icon.
@@ -253,6 +257,22 @@ private fun MapPreview(
             markerVisible = false
             if (mode == SimulationMode.ROUTE && route != null) {
                 renderRoute(c, route.points, route.closeLoop)
+                val activeRouteSession = runtimeSession?.takeIf { it.kind == RuntimeSessionKind.ROUTE }
+                val speed = activeRouteSession?.speedMps
+                if (speed != null && speed > 0.0) {
+                    val playbackMode = if (activeRouteSession.closeLoop) PlaybackMode.LOOP else PlaybackMode.OUT_AND_BACK
+                    val current = RouteMath.interpolateRoute(
+                        points = route.points,
+                        elapsedMillis = activeRouteSession.activeElapsedMillis,
+                        speedMps = speed,
+                        playbackMode = playbackMode
+                    )
+                    c.addMarker(
+                        RoutePoint(current.latWgs84, current.lngWgs84),
+                        "当前位置",
+                        MarkerKind.CURRENT
+                    )
+                }
                 if (cameraKey != lastCameraKey) route.points.firstOrNull()?.let { c.animateCamera(it, 15f) }
             } else if (mode == SimulationMode.POINT) {
                 val p = fallback
@@ -281,7 +301,7 @@ private fun PointConfiguration(
                 onValueChange = onLatChange,
                 label = "纬度 WGS-84",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(56.dp),
                 singleLine = true
             )
             RouteVergeTextField(
@@ -289,7 +309,7 @@ private fun PointConfiguration(
                 onValueChange = onLngChange,
                 label = "经度 WGS-84",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(56.dp),
                 singleLine = true
             )
         }
@@ -343,7 +363,7 @@ private fun SpeedSelector(
                 onClick = { onSpeedTextChange(formatNumber(preset.speedMps)) },
                 modifier = Modifier
                     .weight(1f)
-                    .height(64.dp)
+                    .height(56.dp)
             )
         }
         RouteVergeTextField(
@@ -355,7 +375,7 @@ private fun SpeedSelector(
             textStyle = MaterialTheme.typography.bodyLarge,
             modifier = Modifier
                 .weight(0.82f)
-                .height(64.dp)
+                .height(56.dp)
         )
     }
 }
