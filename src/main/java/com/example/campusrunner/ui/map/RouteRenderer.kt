@@ -21,7 +21,7 @@ internal fun renderRoute(
 ) {
     controller.clear()
 
-    // Committed route line — the primary visual (brand blue, ~8f).
+    // Committed route line — a coral route overlay; the underlying map is untouched.
     if (points.size >= 2) {
         val visiblePoints = if (closeLoopPreview) points + points.first() else points
         controller.addPolyline(visiblePoints, android.graphics.Color.parseColor(RouteVergeBrand.PrimaryHex), RouteVergeMapTokens.routeStrokeWidth)

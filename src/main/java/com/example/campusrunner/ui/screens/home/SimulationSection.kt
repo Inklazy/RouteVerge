@@ -21,14 +21,9 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -90,7 +85,7 @@ internal enum class SimulationMode { POINT, ROUTE }
  * configuration, one primary action, and — while running — low-noise
  * playback controls instead of configuration.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 internal fun SimulationSection(
     routes: List<SavedRoute>,
@@ -121,10 +116,7 @@ internal fun SimulationSection(
     val selectedPoint = savedPoints.firstOrNull { it.id == selectedPointId }
 
     Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.md)) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(selected = mode == SimulationMode.POINT, onClick = { onModeChange(SimulationMode.POINT) }, shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)) { Text("定点") }
-            SegmentedButton(selected = mode == SimulationMode.ROUTE, onClick = { onModeChange(SimulationMode.ROUTE) }, shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)) { Text("路线") }
-        }
+        ModeSelector(mode = mode, onModeChange = onModeChange)
         val reducedMotion = rememberRouteVergeReducedMotion()
         // Keep the embedded map outside AnimatedContent: switching the mode
         // must not create two AndroidView instances or wait for map work.
@@ -156,6 +148,63 @@ internal fun SimulationSection(
                         }
                     }
                 }
+        }
+    }
+}
+
+@Composable
+private fun ModeSelector(
+    mode: SimulationMode,
+    onModeChange: (SimulationMode) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RouteVergeShapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            ModeOption("定点", mode == SimulationMode.POINT, { onModeChange(SimulationMode.POINT) }, Modifier.weight(1f))
+            ModeOption("路线", mode == SimulationMode.ROUTE, { onModeChange(SimulationMode.ROUTE) }, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ModeOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    val color by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background,
+        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        label = "mode_selector_color"
+    )
+    Surface(
+        color = color,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RouteVergeShapes.small,
+        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+        modifier = modifier
+            .height(48.dp)
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (selected) {
+                Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.small))
+                Spacer(Modifier.width(RouteVergeSpacing.xs))
+            }
+            Text(label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -334,7 +383,7 @@ private fun SpeedPresetButton(
         color = backgroundColor,
         contentColor = contentColor,
         shape = RouteVergeShapes.medium,
-        border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else Color.Transparent),
+        border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.outline else Color.Transparent),
         modifier = modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
     ) {
         Column(
@@ -462,7 +511,7 @@ private fun RuntimeSurface(
                 RouteVergeButton(onClick = onStop, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
             } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
-                    RouteVergeButton(onClick = if (isServicePaused) onResumeMock else onPause, modifier = Modifier.weight(1f).graphicsLayer { scaleX = pauseContentScale; scaleY = pauseContentScale }, leadingIcon = {
+                    RouteVergeButton(onClick = if (isServicePaused) onResumeMock else onPause, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f).graphicsLayer { scaleX = pauseContentScale; scaleY = pauseContentScale }, leadingIcon = {
                         AnimatedContent(targetState = isServicePaused, transitionSpec = { if (reducedMotion) fadeIn(tween(0)) togetherWith fadeOut(tween(0)) else (fadeIn(RouteVergeMotion.tweenSpec()) + scaleIn(initialScale = 0.96f)) togetherWith (fadeOut(RouteVergeMotion.tweenSpec()) + scaleOut(targetScale = 0.96f)) }, label = "pause_resume_icon") { paused ->
                             Icon(if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard))
                         }

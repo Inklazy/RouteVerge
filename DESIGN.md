@@ -1,121 +1,94 @@
 # RouteVerge Design System
 
-version | 1.0
-name | RouteVerge Calm Navigation
+version | 2.0
+name | RouteVerge Warm Navigation
 platform | Android · Jetpack Compose · Material 3
-description | A quiet, map-first control surface for route simulation and fixed-point simulation. Content and map context lead; controls remain clear, stable, and easy to stop.
+description | A map-first control surface with Claude-inspired warm editorial surfaces, restrained motion, and stable simulation controls.
 
-## Overview
+## Direction
 
-RouteVerge uses a bright, low-noise interface inspired by Apple's restrained hierarchy: generous whitespace, near-black typography, one confident action blue, soft neutral surfaces, and minimal decoration. The map is the primary object. Controls should explain the current state without competing with it.
+RouteVerge uses a warm cream canvas and near-black warm ink. Coral is a scarce action color: it marks primary operations and essential emphasis, never the whole interface. Hierarchy comes from cream surface steps and 1dp hairlines before elevation or shadows. The real map remains unfiltered and is reused while switching between point and route modes.
 
-## Design principles
+## Principles
 
-- Map first: route and point previews occupy the main visual area.
-- Stable controls: switching modes or starting simulation never relocates the primary action.
-- One clear action: blue is reserved for the current primary action and selected interactive controls.
-- Calm hierarchy: status, map, configuration, saved records, and tools appear in that order.
-- Whole-row interaction: saved records are selected by tapping the complete row; avoid ambiguous affordances.
-- Safe stopping: every running mode exposes an obvious stop action while preserving the stable two-button route control row.
+- Map first: route and point previews remain the visual anchor.
+- Stable controls: the route action row keeps its two columns and dimensions in ready, running, and paused states.
+- One action color: coral is reserved for primary actions, active state, and necessary emphasis.
+- Whole-row interaction: saved records select from the complete row; menus and actions have independent targets.
+- Semantic status: the Alipay NFC verification dot stays green; warning, error, and business-priority switches retain their own neutral/status colors.
+- Low-noise motion: selector and content transitions are short and independent from map loading.
 
 ## Colors
 
 Token | Value | Use
 --- | --- | ---
-`primary` | `#0A6ED1` | Primary buttons, selected links, map-selection action
-`primary-pressed` | `#0759AA` | Pressed state
-`primary-container` | `#E5F1FF` | Selected speed option and subtle selection surfaces
-`on-primary` | `#FFFFFF` | Text and icons on primary controls
-`canvas` | `#FFFFFF` | Main page background
-`surface` | `#FFFFFF` | Cards and map container
-`surface-soft` | `#F7F8FA` | Secondary grouping and inactive surfaces
-`surface-selected` | `#E2EAF5` | Selected segment background
-`ink` | `#1D1D1F` | Primary text
-`ink-muted` | `#6F7378` | Secondary text, labels, metadata
-`ink-subtle` | `#979BA1` | Disabled and tertiary text
-`hairline` | `#E1E5EA` | Card and control borders
-`status-ready` | `#35C875` | Ready/verified status indicators only
-`priority-low` | `#B8BDC5` | Low-priority switches
-`priority-medium` | `#737A84` | Medium-priority switches
-`priority-high` | `#3D444D` | High-priority switches
-`danger` | `#D64545` | Destructive or stopped-error state
+`primary` | `#CC785C` | Main action buttons and essential emphasis
+`primary-pressed` | `#A9583E` | Pressed/active primary action
+`primary-disabled` | `#E6DFD8` | Disabled controls
+`canvas` | `#FAF9F5` | Page background and secondary buttons
+`surface-soft` | `#F5F0E8` | Light grouping surfaces
+`surface-card` | `#EFE9DE` | Cards and unselected control groups
+`surface-strong` | `#E8E0D2` | Selected rows, selected presets, active selector item
+`ink` | `#141413` | Primary text and selected icons
+`body` | `#3D3D3A` | Normal text
+`muted` | `#6C6A64` | Metadata and labels
+`muted-soft` | `#8E8B82` | Disabled/tertiary text
+`hairline` | `#E6DFD8` | 1dp borders
+`hairline-soft` | `#EBE6DF` | Subtle dividers
+`surface-dark` | `#181715` | Dark emphasis surfaces
+`success` | `#5DB872` | Verified/enabled status, including Alipay NFC dot
+`warning` | `#D4A017` | Warning state
+`error` | `#C64545` | Destructive/error state
 
-Do not use gradients, decorative shadows, or additional accent colors. The green status dot for Alipay NFC remains semantic and is not part of the switch-priority palette.
+Avoid cool blue brand accents, gradients, and decorative shadows. Shadows are 0dp by default; color-block contrast and hairlines establish depth.
 
 ## Typography
 
-Use the Android system sans-serif family. Prefer `FontWeight.Normal` and `FontWeight.SemiBold`; avoid heavy bold text.
+Use the Android system humanist sans-serif for readable native UI. Display serif is optional; do not add a font dependency solely for the title.
 
-Token | Size | Weight | Line height | Use
---- | --- | --- | --- | ---
-`screen-title` | 32sp | 400 | 1.15 | RouteVerge title
-`section-title` | 22sp | 400 | 1.25 | Saved routes/points, Tools
-`body` | 17sp | 400 | 1.45 | Main labels and actions
-`body-strong` | 17sp | 600 | 1.3 | Selected item/name
-`caption` | 14sp | 400 | 1.4 | Metadata and WGS-84 labels
-`status` | 18sp | 400 | 1.3 | Current status text
+Token | Size | Weight | Use
+--- | --- | --- | ---
+`screen-title` | 32sp | 400 | App title
+`section-title` | 18–22sp | 500–600 | Section headings
+`body` | 16–17sp | 400 | Labels and actions
+`body-strong` | 16–17sp | 600 | Selected names and key values
+`caption` | 13–14sp | 400 | Coordinates, distances, metadata
 
-Use tabular numerals for coordinates, distances, speeds, and counts.
+Use tabular numerals for coordinates, distances, speeds, and counts where available.
 
-## Layout
+## Layout and shapes
 
-- Base spacing unit: 8dp.
-- Screen horizontal padding: 36dp on the reference phone; use responsive 16–24dp on narrower devices.
-- Vertical rhythm: 8, 16, 24, 32, 48dp.
-- Current-status card: large rounded container, 24dp internal padding, clear status badge on the trailing side.
-- Mode selector: full-width pill, 56dp minimum height, selected half filled with `surface-selected`.
-- Map preview: full available width, approximately 280–360dp height depending on device, 32dp corner radius, 1dp `hairline` border, no heavy shadow.
-- Primary buttons: 56dp minimum height, pill radius, centered icon and label. Route actions use a stable two-column row: secondary new/pause/continue on the left and primary start/stop on the right.
-- Two-column controls such as coordinates and point actions use equal flexible columns with 16dp spacing.
-- Respect system bars and bottom gesture insets; content must remain scrollable.
+- Base spacing: 4 / 8 / 12 / 16 / 20 / 24 / 32dp.
+- Screen horizontal padding: 16–24dp; content remains scrollable and respects safe insets.
+- Status card: warm soft surface, 16–20dp radius, 16dp internal padding, trailing badge that does not move the description.
+- Mode selector: full-width warm segmented surface, 52dp minimum height. Selected item animates to `surface-strong`, uses dark ink and a check icon; inactive item stays on the canvas.
+- Map preview: reused map instance, full available width, 220dp home preview, 20dp radius, 1dp hairline, no filter or heavy shadow.
+- Primary buttons: 48dp minimum height, pill radius, coral fill, white label.
+- Secondary buttons: same dimensions and stable placement, canvas fill, dark ink, 1dp hairline.
 
-## Components
+## Saved records
 
-### Current status card
+Point and route history use `SavedRecordRow` with the type-safe `PointRecord` and `RouteRecord` models. Both rows are 76dp high with the same horizontal padding (16dp), medium radius (12dp), hairline, selected surface, press feedback, vertical alignment, and trailing overflow target. Stable record IDs are used as Compose keys.
 
-Shows `当前状态`, a concise state description, and a trailing status badge. The badge is informational; it must not shift the card's text when its value changes.
+- Point records show only the point name and coordinate subtitle. If metadata is unavailable, the subtitle line is reserved so the row does not shrink.
+- Route records show route summary fields such as distance, point count, and loop mode.
+- Tapping the row selects the record and updates the map/configuration. Tapping the overflow menu does not select the row.
+- The former right-side triangle/play controls are removed. Route playback is available from the row overflow menu (`开始路线`) and the page-level primary action.
 
-### Mode selector
+## Simulation states
 
-The `定点 / 路线` selector stays directly below the status card on both pages. The selected segment uses `surface-selected` and a check icon. Switching mode preserves the selector's position.
-
-### Map preview
-
-Reuse the existing real map component. Route mode displays the selected saved route. Point mode displays the selected map coordinate or saved point. Empty states should explain the next action without fake map data.
-
-### Primary action
-
-Blue, pill-shaped. `开始路线` starts route simulation. `开始定点` starts point simulation. While point simulation is running, the same location displays `停止模拟`. Route simulation uses `暂停模拟`/`继续模拟` beside `停止模拟`; the two buttons keep the same position and width in every route state.
-
-### Saved records
-
-Saved route and point rows are full-width tappable surfaces. The entire row selects the record; do not render a right-side expand/select triangle. Keep independent play and overflow actions where they exist, with adequate touch targets.
-
-Point names are optional. If empty, generate `点位1`, `点位2`, etc.; otherwise preserve the entered name. Store latitude and longitude with the point.
-
-### Tools
-
-Tools remain after saved records. Alipay NFC jump is always visible at the highest layout layer and must not be covered by scroll content. Its green dot communicates verification/enabled state; the trailing chevron communicates navigation.
-
-## Interaction states
-
-State | Route action | Point action
+State | Route action row | Point action
 --- | --- | ---
-Ready | `开始路线` | `开始定点`
-Running | `暂停模拟` available; `停止模拟` ends run | `停止模拟`
-Paused | `继续模拟` and `停止模拟` | Not applicable
-Stopped | Return to ready state | Return to ready state
+Ready | `新建路线` (secondary) + `开始路线` (primary) | `地图选点` (secondary) + `开始定点` (primary)
+Running | `暂停模拟` (secondary) + `停止模拟` (primary) | `停止模拟` only
+Paused | `继续模拟` (secondary) + `停止模拟` (primary) | Not applicable
 
-Starting or stopping must not move the primary button. Pause applies only to route simulation and means remaining at the current route point until resumed.
+The two route columns keep their width, height, and gap in every state. Pausing retains the current route position; resuming never restarts at the beginning.
 
-## Accessibility and motion
+## Tools and accessibility
 
-- Minimum touch target: 48dp.
-- Maintain readable contrast for all text and controls.
-- Provide content descriptions for settings, map selection, play, stop, pause, and overflow icons.
-- Use short 150–250ms state transitions. Do not animate layout reordering.
-- Announce simulation state changes for accessibility services.
+The Alipay NFC tool remains visible after saved records. Its green status dot communicates verified/enabled state and must not be recolored coral. All interactive targets are at least 48dp and expose content descriptions. State transitions use approximately 150–250ms motion and do not reorder layout.
 
 ## Implementation guidance
 
-Keep shared components and tokens in the existing theme/design-system layer. Prefer Material 3 components with explicit colors, shapes, and typography. Keep business state separate from presentation state so route pause state cannot leak into point simulation. Validate on small and large portrait screens, with long saved-record lists and with the NFC tool enabled.
+Keep tokens in `ui/theme/Theme.kt`, shared controls in `ui/components`, and business state in the existing Activity/AppRoot flow. Reuse the existing map controller and map instance across mode changes. Material 3 is the component foundation; explicit colors, shapes, borders, and zero tonal elevation keep the warm editorial hierarchy consistent in light and dark themes.

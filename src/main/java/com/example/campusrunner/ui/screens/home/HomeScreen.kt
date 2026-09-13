@@ -1,13 +1,11 @@
 package com.example.campusrunner.ui.screens.home
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,10 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,11 +35,11 @@ import androidx.compose.ui.Modifier
 import com.example.campusrunner.data.SavedRoute
 import com.example.campusrunner.data.SavedPoint
 import com.example.campusrunner.data.MapProvider
-import com.example.campusrunner.data.SpeedPreset
 import com.example.campusrunner.ui.RuntimeSession
 import com.example.campusrunner.ui.components.RouteVergeIconButton
 import com.example.campusrunner.ui.components.RouteVergeIconButtonVariant
-import com.example.campusrunner.ui.formatNumber
+import com.example.campusrunner.ui.components.PointRecord
+import com.example.campusrunner.ui.components.SavedRecordRow
 import com.example.campusrunner.ui.formatCoordinate
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
 
@@ -216,28 +210,20 @@ private fun SavedPointsSection(points: List<SavedPoint>, selectedId: String?, on
         }
         points.forEach { point ->
             key(point.id) {
-            AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut() + shrinkVertically()) {
-            val reducedMotion = com.example.campusrunner.ui.theme.rememberRouteVergeReducedMotion()
-            val rowColor by androidx.compose.animation.animateColorAsState(
-                if (point.id == selectedId) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
-                animationSpec = com.example.campusrunner.ui.theme.RouteVergeMotion.spec(reducedMotion), label = "point_selection_color"
-            )
-            var menuExpanded by remember { mutableStateOf(false) }
             var confirmDelete by remember { mutableStateOf(false) }
-            Row(modifier = Modifier.fillMaxWidth().background(rowColor, com.example.campusrunner.ui.theme.RouteVergeShapes.medium).clickable { onSelect(point.id); onLatChange(formatCoordinate(point.point.latWgs84)); onLngChange(formatCoordinate(point.point.lngWgs84)) }.padding(start = RouteVergeSpacing.sm, end = RouteVergeSpacing.xs, top = RouteVergeSpacing.sm, bottom = RouteVergeSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Text(point.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                RouteVergeIconButton(
-                    onClick = { menuExpanded = true },
-                    variant = RouteVergeIconButtonVariant.Plain,
-                    contentDescription = "点位操作"
-                ) {
-                    androidx.compose.material3.Icon(Icons.Rounded.MoreVert, contentDescription = null)
+            SavedRecordRow(
+                record = PointRecord(point, "${formatCoordinate(point.point.latWgs84)}, ${formatCoordinate(point.point.lngWgs84)}"),
+                selected = point.id == selectedId,
+                onSelect = {
+                    onSelect(point.id)
+                    onLatChange(formatCoordinate(point.point.latWgs84))
+                    onLngChange(formatCoordinate(point.point.lngWgs84))
+                },
+                menuContent = { dismiss ->
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("编辑位置") }, onClick = { dismiss(); onEdit(point) })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("删除") }, onClick = { dismiss(); confirmDelete = true })
                 }
-            }
-            androidx.compose.material3.DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                androidx.compose.material3.DropdownMenuItem(text = { Text("编辑位置") }, onClick = { menuExpanded = false; onEdit(point) })
-                androidx.compose.material3.DropdownMenuItem(text = { Text("删除") }, onClick = { menuExpanded = false; confirmDelete = true })
-            }
+            )
             if (confirmDelete) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { confirmDelete = false },
@@ -246,7 +232,6 @@ private fun SavedPointsSection(points: List<SavedPoint>, selectedId: String?, on
                     confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = false; onDelete(point.id) }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
                     dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = false }) { Text("取消") } }
                 )
-            }
             }
             }
         }

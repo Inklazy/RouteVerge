@@ -15,6 +15,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import com.example.campusrunner.ui.theme.RouteVergeShapes
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
 import com.example.campusrunner.ui.theme.RouteVergeMotion
 import com.example.campusrunner.ui.theme.rememberRouteVergeReducedMotion
+import com.example.campusrunner.ui.theme.RouteVergeTheme
 
 /**
  * RouteVerge button — wraps Material 3 buttons with the RouteVerge look.
@@ -105,6 +107,11 @@ fun RouteVergeButton(
     }
     // Loading disables interaction: no repeated clicks, a11y reads it as disabled.
     val interactive = enabled && !loading
+    val filledContainerColor = if (pressed && interactive) {
+        RouteVergeTheme.palette.primaryPressed
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
     when (variant) {
         RouteVergeButtonVariant.Filled -> Button(
             onClick = onClick,
@@ -112,6 +119,12 @@ fun RouteVergeButton(
             enabled = interactive,
             shape = shape ?: RouteVergeShapes.pill,
             contentPadding = contentPadding,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = filledContainerColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
             interactionSource = interactionSource,
             content = content
         )
@@ -133,6 +146,11 @@ fun RouteVergeButton(
             enabled = interactive,
             shape = shape ?: RouteVergeShapes.large,
             contentPadding = contentPadding,
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             interactionSource = interactionSource,
             content = content
         )

@@ -1,6 +1,5 @@
 package com.example.campusrunner.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
@@ -8,8 +7,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,7 +14,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -37,11 +33,12 @@ import androidx.compose.ui.unit.dp
  */
 
 // ===== Brand constants (platform-level, e.g. native map rendering) =====
-// DESIGN.md §4.1 — the RouteVerge identity blue stays fixed in both modes.
+// Claude-inspired RouteVerge identity tokens. Map SDK rendering uses these
+// only for semantic overlays; the underlying real map remains untouched.
 object RouteVergeBrand {
-    const val PrimaryHex = "#3482FF"
-    const val SuccessHex = "#36D167"
-    const val DangerHex = "#FF4D4F"
+    const val PrimaryHex = "#CC785C"
+    const val SuccessHex = "#5DB872"
+    const val DangerHex = "#C64545"
 }
 
 // ===== Spacing tokens =====
@@ -96,15 +93,16 @@ object RouteVergeShapes {
 data class RouteVergePalette(
     // Brand / primary
     val primary: Color,
+    val primaryPressed: Color,
     val onPrimary: Color,
     val primaryContainer: Color,
     val onPrimaryContainer: Color,
-    // Secondary (calm blue-gray, NOT a status color)
+    // Secondary warm neutrals (NOT status colors)
     val secondary: Color,
     val onSecondary: Color,
     val secondaryContainer: Color,
     val onSecondaryContainer: Color,
-    // Tertiary (muted slate, reserved for future accents)
+    // Tertiary warm neutral, reserved for future accents
     val tertiary: Color,
     val onTertiary: Color,
     val tertiaryContainer: Color,
@@ -140,79 +138,81 @@ data class RouteVergePalette(
 )
 
 val RouteVergeLightPalette = RouteVergePalette(
-    primary = Color(0xFF0066CC),
+    primary = Color(0xFFCC785C),
+    primaryPressed = Color(0xFFA9583E),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE5F0FF),
-    onPrimaryContainer = Color(0xFF004B99),
-    secondary = Color(0xFF5A6B87),
+    primaryContainer = Color(0xFFE8E0D2),
+    onPrimaryContainer = Color(0xFF141413),
+    secondary = Color(0xFF6C6A64),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDCE4F0),
-    onSecondaryContainer = Color(0xFF2C3B52),
-    tertiary = Color(0xFF64748B),
+    secondaryContainer = Color(0xFFEFE9DE),
+    onSecondaryContainer = Color(0xFF3D3D3A),
+    tertiary = Color(0xFF8E8B82),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFDAE2F0),
-    onTertiaryContainer = Color(0xFF2E3A4A),
-    background = Color(0xFFF5F5F7),
-    onBackground = Color(0xFF1D1D1F),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1D1D1F),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFDFEFF),
-    surfaceContainer = Color(0xFFF5F5F7),
-    surfaceContainerHigh = Color(0xFFFAFAFC),
-    surfaceContainerHighest = Color(0xFFEAEAEC),
-    surfaceVariant = Color(0xFFF5F5F7),
-    onSurfaceVariant = Color(0xFF6E6E73),
-    surfaceBright = Color(0xFFFDFEFF),
-    surfaceDim = Color(0xFFE2E6EE),
-    outline = Color(0xFFDDE3EE),
-    outlineVariant = Color(0xFFE4E9F2),
-    error = Color(0xFFFF4D4F),
+    tertiaryContainer = Color(0xFFE8E0D2),
+    onTertiaryContainer = Color(0xFF3D3D3A),
+    background = Color(0xFFFAF9F5),
+    onBackground = Color(0xFF141413),
+    surface = Color(0xFFFAF9F5),
+    onSurface = Color(0xFF141413),
+    surfaceContainerLowest = Color(0xFFFAF9F5),
+    surfaceContainerLow = Color(0xFFF5F0E8),
+    surfaceContainer = Color(0xFFEFE9DE),
+    surfaceContainerHigh = Color(0xFFE8E0D2),
+    surfaceContainerHighest = Color(0xFFE6DFD8),
+    surfaceVariant = Color(0xFFF5F0E8),
+    onSurfaceVariant = Color(0xFF6C6A64),
+    surfaceBright = Color(0xFFFAF9F5),
+    surfaceDim = Color(0xFFE6DFD8),
+    outline = Color(0xFFE6DFD8),
+    outlineVariant = Color(0xFFEBE6DF),
+    error = Color(0xFFC64545),
     onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002),
-    inverseSurface = Color(0xFF2E3644),
-    inverseOnSurface = Color(0xFFF2F5FA),
-    inversePrimary = Color(0xFF9DC3FF),
-    textDisabled = Color(0xFF98A2B3)
+    errorContainer = Color(0xFFF5D8D2),
+    onErrorContainer = Color(0xFF5A1B18),
+    inverseSurface = Color(0xFF181715),
+    inverseOnSurface = Color(0xFFFAF9F5),
+    inversePrimary = Color(0xFFE6A28A),
+    textDisabled = Color(0xFF8E8B82)
 )
 
 val RouteVergeDarkPalette = RouteVergePalette(
-    primary = Color(0xFF2997FF),
-    onPrimary = Color(0xFF001B33),
-    primaryContainer = Color(0xFF123B61),
-    onPrimaryContainer = Color(0xFFD5E8FF),
-    secondary = Color(0xFFADBFD8),
-    onSecondary = Color(0xFF223041),
-    secondaryContainer = Color(0xFF33445C),
-    onSecondaryContainer = Color(0xFFD4E4F9),
-    tertiary = Color(0xFFA9B8CE),
-    onTertiary = Color(0xFF273344),
-    tertiaryContainer = Color(0xFF3A4A60),
-    onTertiaryContainer = Color(0xFFDAE3F1),
-    background = Color(0xFF000000),
-    onBackground = Color(0xFFF5F5F7),
-    surface = Color(0xFF1C1C1E),
-    onSurface = Color(0xFFF5F5F7),
-    surfaceContainerLowest = Color(0xFF000000),
-    surfaceContainerLow = Color(0xFF1C1C1E),
-    surfaceContainer = Color(0xFF242426),
-    surfaceContainerHigh = Color(0xFF2C2C2E),
-    surfaceContainerHighest = Color(0xFF38383A),
-    surfaceVariant = Color(0xFF2C2C2E),
-    onSurfaceVariant = Color(0xFFAEAEB2),
-    surfaceBright = Color(0xFF38383A),
-    surfaceDim = Color(0xFF000000),
-    outline = Color(0xFF48484A),
-    outlineVariant = Color(0xFF38383A),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
-    inverseSurface = Color(0xFFE4E8F0),
-    inverseOnSurface = Color(0xFF1D222B),
-    inversePrimary = Color(0xFF0066CC),
-    textDisabled = Color(0xFF6C7480)
+    primary = Color(0xFFCC785C),
+    primaryPressed = Color(0xFFA9583E),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF493229),
+    onPrimaryContainer = Color(0xFFF5D8CC),
+    secondary = Color(0xFFB7B1A8),
+    onSecondary = Color(0xFF272521),
+    secondaryContainer = Color(0xFF3B3832),
+    onSecondaryContainer = Color(0xFFE8E0D2),
+    tertiary = Color(0xFF8E8B82),
+    onTertiary = Color(0xFF272521),
+    tertiaryContainer = Color(0xFF3B3832),
+    onTertiaryContainer = Color(0xFFE8E0D2),
+    background = Color(0xFF181715),
+    onBackground = Color(0xFFFAF9F5),
+    surface = Color(0xFF1F1E1B),
+    onSurface = Color(0xFFFAF9F5),
+    surfaceContainerLowest = Color(0xFF181715),
+    surfaceContainerLow = Color(0xFF1F1E1B),
+    surfaceContainer = Color(0xFF252320),
+    surfaceContainerHigh = Color(0xFF2D2A26),
+    surfaceContainerHighest = Color(0xFF3A3630),
+    surfaceVariant = Color(0xFF2D2A26),
+    onSurfaceVariant = Color(0xFFA09D96),
+    surfaceBright = Color(0xFF3A3630),
+    surfaceDim = Color(0xFF181715),
+    outline = Color(0xFF514B43),
+    outlineVariant = Color(0xFF3A3630),
+    error = Color(0xFFE38A84),
+    onError = Color(0xFF3D0908),
+    errorContainer = Color(0xFF64221E),
+    onErrorContainer = Color(0xFFF5D8D2),
+    inverseSurface = Color(0xFFFAF9F5),
+    inverseOnSurface = Color(0xFF181715),
+    inversePrimary = Color(0xFF9F5540),
+    textDisabled = Color(0xFF8E8B82)
 )
 
 /**
@@ -236,33 +236,33 @@ data class RouteVergeStatusColors(
 )
 
 val RouteVergeLightStatusColors = RouteVergeStatusColors(
-    success = Color(0xFF36D167),
+    success = Color(0xFF5DB872),
     onSuccess = Color(0xFFFFFFFF),
-    successContainer = Color(0xFFD9F5E3),
-    onSuccessContainer = Color(0xFF0B6B33),
-    warning = Color(0xFFFFA726),
-    onWarning = Color(0xFF4A2C00),
-    warningContainer = Color(0xFFFFE9CC),
-    onWarningContainer = Color(0xFF6E4300),
-    danger = Color(0xFFFF4D4F),
+    successContainer = Color(0xFFDDEEDB),
+    onSuccessContainer = Color(0xFF1B5E2A),
+    warning = Color(0xFFD4A017),
+    onWarning = Color(0xFF3D2D00),
+    warningContainer = Color(0xFFF4E5B8),
+    onWarningContainer = Color(0xFF5A4300),
+    danger = Color(0xFFC64545),
     onDanger = Color(0xFFFFFFFF),
-    dangerContainer = Color(0xFFFFDAD6),
-    onDangerContainer = Color(0xFF410002)
+    dangerContainer = Color(0xFFF5D8D2),
+    onDangerContainer = Color(0xFF5A1B18)
 )
 
 val RouteVergeDarkStatusColors = RouteVergeStatusColors(
-    success = Color(0xFF77DD96),
+    success = Color(0xFF5DB872),
     onSuccess = Color(0xFF00391C),
     successContainer = Color(0xFF1E4A30),
     onSuccessContainer = Color(0xFFA9F2BE),
-    warning = Color(0xFFFFB74D),
+    warning = Color(0xFFD4A017),
     onWarning = Color(0xFF3F2A00),
-    warningContainer = Color(0xFF4A3200),
-    onWarningContainer = Color(0xFFFFDDB2),
-    danger = Color(0xFFFFB4AB),
+    warningContainer = Color(0xFF4A3C16),
+    onWarningContainer = Color(0xFFF4E5B8),
+    danger = Color(0xFFE38A84),
     onDanger = Color(0xFF690005),
-    dangerContainer = Color(0xFF93000A),
-    onDangerContainer = Color(0xFFFFDAD6)
+    dangerContainer = Color(0xFF64221E),
+    onDangerContainer = Color(0xFFF5D8D2)
 )
 
 // ===== Theme access =====
@@ -392,29 +392,23 @@ private fun routeVergeDarkColorScheme(
  * RouteVerge theme entry point.
  *
  * @param darkTheme follows the system setting by default.
- * @param dynamicColor disabled by default — RouteVerge keeps its fixed brand identity
- *   (decision from the Phase 2 kick-off). The parameter stays for future expansion
- *   (e.g. an optional "dynamic color" setting).
+ * @param dynamicColor retained for API compatibility; RouteVerge deliberately keeps
+ *   its fixed warm palette so system dynamic colors never replace the brand tokens.
  */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun RouteVergeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
     val palette = if (darkTheme) RouteVergeDarkPalette else RouteVergeLightPalette
     val statusColors = if (darkTheme) RouteVergeDarkStatusColors else RouteVergeLightStatusColors
 
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && darkTheme ->
-            dynamicDarkColorScheme(context)
-
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            dynamicLightColorScheme(context)
-
-        darkTheme -> routeVergeDarkColorScheme(palette, statusColors)
-        else -> routeVergeLightColorScheme(palette, statusColors)
+    val colorScheme = if (darkTheme) {
+        routeVergeDarkColorScheme(palette, statusColors)
+    } else {
+        routeVergeLightColorScheme(palette, statusColors)
     }
 
     CompositionLocalProvider(
