@@ -324,7 +324,6 @@ class MockLocationService : Service() {
 
     private fun refreshNotification(text: String) {
         if (!isRunning) return
-        notificationText = text
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
     }
 
