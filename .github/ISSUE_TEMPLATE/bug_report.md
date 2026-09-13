@@ -25,7 +25,7 @@ assignees: ''
 **环境信息**
 - 设备型号: [例如 Xiaomi 13 / Pixel 7]
 - Android 版本: [例如 Android 13 / 14]
-- RouteVerge 版本: [例如 v2.0.0]
+- RouteVerge 版本: [例如 v2.1.0]
 - 地图类型: [高德地图 / Google Maps]
 
 **附加信息**

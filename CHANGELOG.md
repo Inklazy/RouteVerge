@@ -2,6 +2,21 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/) 规范。
 
+## [2.1.0] - 2026-09-13
+
+### 体验与交互优化
+- 全面优化 Claude 暖色设计体系交互：重构定点/路线双模切换为单胶囊滑动动画与触觉反馈（Haptic Feedback）联动。
+- 优化配速选择器与按钮交互，消除按压时矩形高亮溢出，保持圆角边缘整洁。
+- 完善主界面与控制面板滚动响应与焦点感知，提升小屏幕设备适配体验。
+
+### 稳定性与兼容性修复
+- 修复 Android 14 及以下设备在撤销轨迹点时因调用 List.removeLast() 导致的潜在 NoSuchMethodError 兼容性问题。
+- 规范属性配置路径格式，通过全部标准 Lint 静态检查。
+
+### 构建与发布规范
+- 递增 ersionCode 至 21，ersionName 升级至 2.1.0。
+- 正式版启用 R8 混淆、资源精简与 APK Signature Scheme v2 签名。
+- 规范 GitHub 仓库 Issue 模板与 GitHub Actions CI 持续集成流程。
 ## [2.0.0] - 2026-08-16
 
 ### 重大变更
