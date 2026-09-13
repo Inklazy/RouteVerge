@@ -1,7 +1,7 @@
 package com.example.campusrunner.ui.screens.home
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,20 +10,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
 import com.example.campusrunner.ui.components.RouteVergeStatus
 import com.example.campusrunner.ui.components.StatusDot
 import com.example.campusrunner.ui.theme.RouteVergeShapes
@@ -42,19 +39,16 @@ fun NfcToolsRow(
     onOpenAlipay: () -> Unit,
     onVerify: () -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RouteVergeShapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    Column(
+        // This is deliberately the canvas token, not a card. It remains opaque
+        // so scrolled records can never show through the fixed bottom bar.
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .imePadding()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = RouteVergeSpacing.lg, vertical = RouteVergeSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = RouteVergeSpacing.lg, vertical = RouteVergeSpacing.sm),
-            verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)
-        ) {
             HomeSectionTitle("工具")
             Row(
                 modifier = Modifier
@@ -87,6 +81,5 @@ fun NfcToolsRow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
     }
 }

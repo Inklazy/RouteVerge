@@ -59,9 +59,9 @@ Use tabular numerals for coordinates, distances, speeds, and counts where availa
 ## Layout and shapes
 
 - Base spacing: 4 / 8 / 12 / 16 / 20 / 24 / 32dp.
-- Screen horizontal padding: 16–24dp; content remains scrollable and respects safe insets.
+- Screen horizontal padding: 16–24dp. On Home, the control area is fixed and only the saved-record viewport scrolls; all areas respect safe insets.
 - Status card: warm soft surface, 16–20dp radius, 16dp internal padding, trailing badge that does not move the description.
-- Mode selector: full-width warm segmented surface, 52dp minimum height. Selected item animates to `surface-strong`, uses dark ink and a check icon; inactive item stays on the canvas.
+- Mode selector: full-width warm segmented surface, 52dp minimum height. Selected item animates as one moving warm-color capsule, uses dark ink and a check icon; inactive item stays on the canvas. The two transparent option targets locally set `indication = null` with remembered interaction sources: holding an option must not draw a Ripple, rectangular pressed layer, second background, or elevation. Preserve tab semantics and focus handling; only the moving capsule expresses selection.
 - Map preview: reused map instance, full available width, 220dp home preview, 20dp radius, 1dp hairline, no filter or heavy shadow.
 - During a running route, the preview adds one semantic current-position marker derived from the persisted active route clock; the base map and route geometry remain unchanged.
 - Point coordinates: keep the two-column layout with 56dp text-field height and compact vertical rhythm; never reduce type size to compress it.
@@ -71,7 +71,7 @@ Use tabular numerals for coordinates, distances, speeds, and counts where availa
 
 ## Saved records
 
-Point and route history use `SavedRecordRow` with the type-safe `PointRecord` and `RouteRecord` models. Both rows are 68dp high with the same horizontal padding (16dp), medium radius (12dp), hairline, selected surface, press feedback, vertical alignment, and trailing overflow target. Stable record IDs are used as Compose keys. Adjacent rows use a 4dp gap without collapsing into one surface.
+Point and route history use `SavedRecordRow` with the type-safe `PointRecord` and `RouteRecord` models. Both rows are 68dp high with the same horizontal padding (16dp), medium radius (12dp), hairline, selected surface, press feedback, vertical alignment, and trailing overflow target. Stable record IDs are used as Compose keys. Adjacent rows use a 4dp gap without collapsing into one surface. Each mode owns an independent `LazyListState`; switching modes preserves the other mode's record position.
 
 - Point records show only the point name and coordinate subtitle. If metadata is unavailable, the subtitle line is reserved so the row does not shrink.
 - Route records show route summary fields such as distance, point count, and loop mode.
@@ -88,9 +88,13 @@ Paused | `继续模拟` (secondary) + `停止模拟` (primary) | Not applicable
 
 The two route columns keep their width, height, and gap in every state. Pausing retains the current route position; resuming never restarts at the beginning.
 
-## Fixed NFC tool bar
+## Home scroll boundary and fixed NFC tool bar
 
-The Alipay NFC row is the `Scaffold.bottomBar`, not a `LazyColumn` item. It uses an opaque warm surface, a hairline, `navigationBarsPadding()` and `imePadding()`, so it stays visible while records scroll and remains above gesture/navigation insets. The scrollable content receives Scaffold's measured bottom-bar inset plus 32dp extra content padding, keeping the last record tappable and unobscured. Point and route modes share this same bottom bar.
+Home is a bounded `Column` in the normal state, not a page-level `verticalScroll` or outer `LazyColumn`. The title/settings app bar, status card, selector, map preview, mode-specific configuration/actions, and the `保存点位` / `保存路线` heading remain outside the list. The matching saved-record `LazyColumn` receives the single `weight(1f)` remainder between that fixed content and the bottom bar, so only records can scroll and their drawing/touch bounds cannot overlap controls. While the IME is visible, the fixed content switches to a bounded vertical scroll viewport and the record list gets an explicit maximum height; this allows focused fields to be brought into view without ever compressing buttons.
+
+The Alipay NFC row is the `Scaffold.bottomBar`, not a list item. Its opaque background is the page `canvas` token (`#FAF9F5` in light mode), with no card fill, rounded outer container, border, or shadow. It uses `navigationBarsPadding()` once when the IME is hidden. While the IME is visible, Home removes the bar from the hierarchy so it is not moved above the keyboard or included in resize calculations; it returns automatically when the IME closes. Scaffold measures the bar and reserves its inset only in the normal app-window state; no additional bottom padding is applied to the record list. Point and route modes share this same bottom bar.
+
+The map remains a fixed-position embedded surface and keeps its own map gestures. It is 220dp when space permits and reduces to 176dp, 144dp, or 112dp for progressively compact height or large font scale; record rows and buttons are never clipped or made page-scrollable to compensate.
 
 ## Background simulation and recovery
 

@@ -15,6 +15,8 @@ object RouteVergeMotion {
     const val buttonPressDuration = 160
     const val contentDuration = 180
     const val listDuration = 220
+    /** The point/route capsule and its paired mode-switch haptic share this token. */
+    const val modeSelectorDuration = 220
 
     fun <T> tweenSpec(
         durationMillis: Int = contentDuration,

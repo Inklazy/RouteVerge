@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -97,6 +98,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keep the activity in resize mode so Compose receives the reduced
+        // IME window bounds. Home then hides its NFC bottom bar and scrolls
+        // content without shrinking the fixed-height action controls.
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         enableEdgeToEdge()
         repository = RouteRepository(this)
         pointRepository = PointRepository(this)
@@ -356,12 +361,13 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "请输入有效经纬度", Toast.LENGTH_SHORT).show()
             return
         }
-        runtimeSessionState.value = RuntimeSession(
-            kind = RuntimeSessionKind.POINT,
-            pointLat = lat,
-            pointLng = lng
-        )
-        startServiceSafely(MockLocationService.pointIntent(this, lat, lng))
+        if (startServiceSafely(MockLocationService.pointIntent(this, lat, lng))) {
+            runtimeSessionState.value = RuntimeSession(
+                kind = RuntimeSessionKind.POINT,
+                pointLat = lat,
+                pointLng = lng
+            )
+        }
     }
 
     private fun startRoute(route: SavedRoute, speedText: String) {
@@ -374,16 +380,7 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "速度必须大于 0", Toast.LENGTH_SHORT).show()
             return
         }
-        runtimeSessionState.value = RuntimeSession(
-            kind = RuntimeSessionKind.ROUTE,
-            routeId = route.id,
-            routeName = route.name,
-            speedMps = speed,
-            closeLoop = route.closeLoop,
-            loopCount = route.loopCount,
-            totalDistanceMeters = RouteMath.totalDistanceMeters(route.points, closeLoop = route.closeLoop)
-        )
-        startServiceSafely(
+        if (startServiceSafely(
             MockLocationService.routeIntent(
                 context = this,
                 route = route,
@@ -391,38 +388,54 @@ class MainActivity : ComponentActivity() {
                 closeLoop = route.closeLoop,
                 loopCount = route.loopCount
             )
-        )
+        )) {
+            runtimeSessionState.value = RuntimeSession(
+                kind = RuntimeSessionKind.ROUTE,
+                routeId = route.id,
+                routeName = route.name,
+                speedMps = speed,
+                closeLoop = route.closeLoop,
+                loopCount = route.loopCount,
+                totalDistanceMeters = RouteMath.totalDistanceMeters(route.points, closeLoop = route.closeLoop)
+            )
+        }
     }
 
     private fun pauseMocking() {
+        if (!serviceRunningState.value || servicePausedState.value) return
         startService(MockLocationService.pauseIntent(this))
         servicePausedState.value = true
     }
 
     private fun resumeMocking() {
+        if (!serviceRunningState.value || !servicePausedState.value) return
         startService(MockLocationService.resumeIntent(this))
         servicePausedState.value = false
     }
 
     private fun stopMocking() {
+        if (!serviceRunningState.value && !servicePausedState.value) return
         startService(MockLocationService.stopIntent(this))
         serviceRunningState.value = false
         servicePausedState.value = false
         runtimeSessionState.value = null
     }
 
-    private fun startServiceSafely(intent: Intent) {
+    private fun startServiceSafely(intent: Intent): Boolean {
+        // The UI changes immediately after this call. Guarding the activity
+        // state here also covers two rapid taps before Compose draws that frame.
+        if (serviceRunningState.value || servicePausedState.value) return false
         if (!nfcLauncher.ensureActivated()) {
-            return
+            return false
         }
         if (!hasLocationPermissionState.value) {
             requestRuntimePermissions()
-            return
+            return false
         }
         if (!canMockState.value) {
             Toast.makeText(this, "请先在开发者选项中选择本应用为模拟位置应用", Toast.LENGTH_LONG).show()
             openDeveloperOptions()
-            return
+            return false
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -432,9 +445,11 @@ class MainActivity : ComponentActivity() {
             }
             serviceRunningState.value = true
             servicePausedState.value = false
+            return true
         } catch (e: SecurityException) {
             Toast.makeText(this, "没有模拟位置权限，请重新选择模拟位置应用", Toast.LENGTH_LONG).show()
             openDeveloperOptions()
+            return false
         }
     }
 

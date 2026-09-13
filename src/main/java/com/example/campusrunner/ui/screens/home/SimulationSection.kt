@@ -1,14 +1,18 @@
 package com.example.campusrunner.ui.screens.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,18 +32,27 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import com.example.campusrunner.data.SavedRoute
 import com.example.campusrunner.data.SavedPoint
 import com.example.campusrunner.data.RoutePoint
@@ -51,6 +64,8 @@ import com.example.campusrunner.ui.RuntimeSessionKind
 import com.example.campusrunner.geo.RouteMath
 import com.example.campusrunner.ui.components.RouteVergeButton
 import com.example.campusrunner.ui.components.RouteVergeButtonVariant
+import com.example.campusrunner.ui.components.RouteVergeButtonHapticFeedback
+import com.example.campusrunner.ui.components.rememberModeSwitchHaptic
 import com.example.campusrunner.ui.components.RouteVergeTextField
 import com.example.campusrunner.ui.formatCoordinate
 import com.example.campusrunner.ui.formatDistance
@@ -67,6 +82,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
@@ -77,8 +93,14 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import com.example.campusrunner.ui.theme.RouteVergeMotion
 import com.example.campusrunner.ui.theme.rememberRouteVergeReducedMotion
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 internal enum class SimulationMode { POINT, ROUTE }
 
@@ -87,7 +109,7 @@ internal enum class SimulationMode { POINT, ROUTE }
  * configuration, one primary action, and — while running — low-noise
  * playback controls instead of configuration.
  */
-@OptIn(ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun SimulationSection(
     routes: List<SavedRoute>,
@@ -112,7 +134,8 @@ internal fun SimulationSection(
     onStartRoute: (SavedRoute, String) -> Unit,
     onPause: () -> Unit,
     onResumeMock: () -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    mapHeight: androidx.compose.ui.unit.Dp
 ) {
     val selectedRoute = routes.firstOrNull { it.id == selectedRouteId } ?: routes.firstOrNull()
     val selectedPoint = savedPoints.firstOrNull { it.id == selectedPointId }
@@ -122,7 +145,7 @@ internal fun SimulationSection(
         val reducedMotion = rememberRouteVergeReducedMotion()
         // Keep the embedded map outside AnimatedContent: switching the mode
         // must not create two AndroidView instances or wait for map work.
-        MapPreview(provider = mapProvider, mode = mode, route = selectedRoute, point = selectedPoint, lat = pointLatInput, lng = pointLngInput, runtimeSession = runtimeSession)
+        MapPreview(provider = mapProvider, mode = mode, route = selectedRoute, point = selectedPoint, lat = pointLatInput, lng = pointLngInput, runtimeSession = runtimeSession, height = mapHeight)
         AnimatedContent(
             targetState = mode,
             transitionSpec = {
@@ -132,24 +155,32 @@ internal fun SimulationSection(
             },
             label = "simulation_mode_content"
         ) { modeState ->
-            AnimatedContent(
-                    targetState = isServiceRunning || isServicePaused,
-                    transitionSpec = {
-                        if (reducedMotion) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                        else (fadeIn(RouteVergeMotion.tweenSpec()) + scaleIn(initialScale = 0.98f)) togetherWith
-                            (fadeOut(RouteVergeMotion.tweenSpec()) + scaleOut(targetScale = 0.98f))
-                    },
-                    label = "simulation_controls_content"
-                ) { running ->
-                    if (running) {
-                        RuntimeSurface(session = runtimeSession, isServicePaused = isServicePaused, onPause = onPause, onResumeMock = onResumeMock, onStop = onStop)
-                    } else {
-                        when (modeState) {
-                            SimulationMode.POINT -> PointConfiguration(pointLatInput, pointLngInput, onPointLatChange, onPointLngChange, onOpenPointPicker, onStartPoint)
-                            SimulationMode.ROUTE -> if (routes.isEmpty()) RouteEmptyState(onCreateRoute = onOpenRouteEditor) else RouteConfiguration(selectedRoute, speedText, onSpeedTextChange, onOpenRouteEditor) { selectedRoute?.let { route -> onStartRoute(route, speedText) } }
-                        }
-                    }
-                }
+            // The map is not a child of this transition. These are only
+            // lightweight control changes and therefore remain responsive even
+            // while the map SDK renders route geometry.
+            val active = isServiceRunning || isServicePaused
+            val sessionModeDiffers = active && (runtimeSession == null ||
+                (modeState == SimulationMode.POINT && runtimeSession.kind == RuntimeSessionKind.ROUTE) ||
+                    (modeState == SimulationMode.ROUTE && runtimeSession.kind == RuntimeSessionKind.POINT))
+            if (sessionModeDiffers) {
+                // A user may switch the selector while a session is active;
+                // keep showing controls for the real session, never a second
+                // start action for the newly selected mode.
+                RuntimeSurface(session = runtimeSession, isServicePaused = isServicePaused, onPause = onPause, onResumeMock = onResumeMock, onStop = onStop)
+            } else when (modeState) {
+                SimulationMode.POINT -> PointConfiguration(
+                    pointLatInput, pointLngInput, onPointLatChange, onPointLngChange,
+                    onOpenPointPicker, onStartPoint, runtimeSession, isServiceRunning,
+                    isServicePaused, onStop
+                )
+                SimulationMode.ROUTE -> if (routes.isEmpty()) RouteEmptyState(onCreateRoute = onOpenRouteEditor)
+                else RouteConfiguration(
+                    selectedRoute, speedText, onSpeedTextChange, onOpenRouteEditor,
+                    { selectedRoute?.let { route -> onStartRoute(route, speedText) } },
+                    runtimeSession, isServiceRunning, isServicePaused, onPause,
+                    onResumeMock, onStop
+                )
+            }
         }
     }
 }
@@ -159,18 +190,90 @@ private fun ModeSelector(
     mode: SimulationMode,
     onModeChange: (SimulationMode) -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RouteVergeShapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth()
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    val modeSwitchHaptic = rememberModeSwitchHaptic()
+    val modeScope = rememberCoroutineScope()
+    // Animate raw dp values so the completion callback is available from
+    // Animatable.animateTo; convert back to Dp only for layout.
+    val capsuleOffset = remember { Animatable(0f) }
+    var modeAnimationJob by remember { mutableStateOf<Job?>(null) }
+    var modeAnimationGeneration by remember { mutableStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                modeAnimationGeneration += 1
+                modeAnimationJob?.cancel()
+                modeAnimationJob = null
+                modeSwitchHaptic.cancel()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            modeAnimationGeneration += 1
+            modeAnimationJob?.cancel()
+            modeSwitchHaptic.cancel()
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RouteVergeShapes.extraLarge)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RouteVergeShapes.extraLarge)
     ) {
-        Row(
-            modifier = Modifier.padding(2.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(2.dp)
         ) {
-            ModeOption("定点", mode == SimulationMode.POINT, { onModeChange(SimulationMode.POINT) }, Modifier.weight(1f))
-            ModeOption("路线", mode == SimulationMode.ROUTE, { onModeChange(SimulationMode.ROUTE) }, Modifier.weight(1f))
+            // maxWidth/maxHeight are the actual inner area after the one,
+            // symmetric 2dp inset. Both positions use this same measured
+            // width, so neither direction accumulates a rounding discrepancy.
+            val indicatorWidth = maxWidth / 2
+            val targetOffset = if (mode == SimulationMode.POINT) 0.dp else indicatorWidth
+            LaunchedEffect(indicatorWidth) {
+                modeAnimationJob?.cancel()
+                capsuleOffset.snapTo(targetOffset.value)
+                modeAnimationJob = null
+            }
+            val indicatorOffset = capsuleOffset.value.dp
+            fun selectMode(targetMode: SimulationMode) {
+                if (targetMode == mode) return
+                modeAnimationJob?.cancel()
+                val generation = modeAnimationGeneration + 1
+                modeAnimationGeneration = generation
+                modeSwitchHaptic.perform(RouteVergeMotion.modeSelectorDuration)
+                val target = (if (targetMode == SimulationMode.POINT) 0.dp else indicatorWidth).value
+                onModeChange(targetMode)
+                modeAnimationJob = modeScope.launch {
+                    capsuleOffset.animateTo(
+                        target,
+                        animationSpec = RouteVergeMotion.spec(reducedMotion, RouteVergeMotion.modeSelectorDuration)
+                    )
+                    if (modeAnimationGeneration == generation) {
+                        modeSwitchHaptic.confirm()
+                    }
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .width(indicatorWidth)
+                    .fillMaxHeight()
+                    .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
+                    .clip(RouteVergeShapes.large)
+                    // Selection is communicated by this single moving color
+                    // block only; no child elevation/shadow can form a seam.
+                    .background(Color(0xFFD8CDBB))
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                ModeOption("定点", mode == SimulationMode.POINT, { selectMode(SimulationMode.POINT) }, Modifier.weight(1f))
+                ModeOption("路线", mode == SimulationMode.ROUTE, { selectMode(SimulationMode.ROUTE) }, Modifier.weight(1f))
+            }
         }
     }
 }
@@ -183,31 +286,49 @@ private fun ModeOption(
     modifier: Modifier = Modifier
 ) {
     val reducedMotion = rememberRouteVergeReducedMotion()
+    // `selectable` otherwise obtains LocalIndication and draws a rectangular
+    // ripple over this half of the control while it is held. The moving
+    // indicator is the selector's only background layer.
+    val interactionSource = remember { MutableInteractionSource() }
     val color by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background,
+        targetValue = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
-        label = "mode_selector_color"
+        label = "mode_selector_text_color"
     )
-    Surface(
-        color = color,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RouteVergeShapes.small,
-        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+    val checkScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (selected) 1f else .75f,
+        animationSpec = RouteVergeMotion.spec(reducedMotion, 180),
+        label = "mode_selector_check_scale"
+    )
+    val checkAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = RouteVergeMotion.spec(reducedMotion, 180),
+        label = "mode_selector_check_alpha"
+    )
+    Row(
         modifier = modifier
             .height(48.dp)
-            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .semantics { stateDescription = if (selected) "$label，已选中" else "$label，未选中" }
+            .selectable(
+                selected = selected,
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (selected) {
-                Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.small))
-                Spacer(Modifier.width(RouteVergeSpacing.xs))
+        Icon(
+            Icons.Rounded.Check,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(RouteVergeIconSizes.small).graphicsLayer {
+                scaleX = checkScale; scaleY = checkScale; alpha = checkAlpha
             }
-            Text(label, style = MaterialTheme.typography.labelLarge)
-        }
+        )
+        Spacer(Modifier.width(RouteVergeSpacing.xs))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = color)
     }
 }
 
@@ -219,7 +340,8 @@ private fun MapPreview(
     point: SavedPoint?,
     lat: String,
     lng: String,
-    runtimeSession: RuntimeSession?
+    runtimeSession: RuntimeSession?,
+    height: androidx.compose.ui.unit.Dp
 ) {
     var controller by remember { mutableStateOf<MapController?>(null) }
     var markerHandle by remember { mutableStateOf<com.example.campusrunner.ui.map.MapMarkerHandle?>(null) }
@@ -234,10 +356,10 @@ private fun MapPreview(
     LaunchedEffect(markerHandle, markerAlpha) { markerHandle?.setAlpha(markerAlpha) }
     val fallback = com.example.campusrunner.data.RoutePoint(lat.toDoubleOrNull() ?: 39.9042, lng.toDoubleOrNull() ?: 116.4074)
     androidx.compose.foundation.layout.Box(
-        Modifier.fillMaxWidth().height(220.dp).clip(RouteVergeShapes.extraLarge)
+        Modifier.fillMaxWidth().height(height).clip(RouteVergeShapes.extraLarge)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RouteVergeShapes.extraLarge)
     ) {
-        CampusMapView(provider, Modifier.fillMaxWidth().height(220.dp)) { c -> controller = c; c.disableUiControls() }
+        CampusMapView(provider, Modifier.fillMaxWidth().height(height)) { c -> controller = c; c.disableUiControls() }
         val routeProgressKey = runtimeSession?.takeIf { it.kind == RuntimeSessionKind.ROUTE }?.activeElapsedMillis
         LaunchedEffect(controller, mode, route?.id, point?.id, lat, lng, routeProgressKey) {
             val c = controller ?: return@LaunchedEffect
@@ -286,6 +408,7 @@ private fun MapPreview(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun PointConfiguration(
     latInput: String,
     lngInput: String,
@@ -293,7 +416,15 @@ private fun PointConfiguration(
     onLngChange: (String) -> Unit,
     onOpenPointPicker: () -> Unit,
     onStartPoint: () -> Unit,
+    runtimeSession: RuntimeSession?,
+    isServiceRunning: Boolean,
+    isServicePaused: Boolean,
+    onStop: () -> Unit,
 ) {
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    val bringIntoViewScope = rememberCoroutineScope()
+    val latRequester = remember { BringIntoViewRequester() }
+    val lngRequester = remember { BringIntoViewRequester() }
     Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.md)) {
         Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
             RouteVergeTextField(
@@ -301,7 +432,11 @@ private fun PointConfiguration(
                 onValueChange = onLatChange,
                 label = "纬度 WGS-84",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f).height(56.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .bringIntoViewRequester(latRequester)
+                    .onFocusChanged { if (it.isFocused) bringIntoViewScope.launch { latRequester.bringIntoView() } },
                 singleLine = true
             )
             RouteVergeTextField(
@@ -309,24 +444,27 @@ private fun PointConfiguration(
                 onValueChange = onLngChange,
                 label = "经度 WGS-84",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f).height(56.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .bringIntoViewRequester(lngRequester)
+                    .onFocusChanged { if (it.isFocused) bringIntoViewScope.launch { lngRequester.bringIntoView() } },
                 singleLine = true
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
-            RouteVergeButton(
-                onClick = onOpenPointPicker,
-                variant = RouteVergeButtonVariant.Outlined,
-                modifier = Modifier.weight(1f),
-                leadingIcon = { Icon(Icons.Rounded.Map, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) },
-                text = { Text("地图选点") }
-            )
-            RouteVergeButton(
-                onClick = onStartPoint,
-                modifier = Modifier.weight(1f),
-                leadingIcon = { Icon(Icons.Rounded.MyLocation, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) },
-                text = { Text("开始定点") }
-            )
+        AnimatedContent(
+            targetState = isServiceRunning || isServicePaused,
+            transitionSpec = { if (reducedMotion) fadeIn(tween(0)) togetherWith fadeOut(tween(0)) else fadeIn(RouteVergeMotion.tweenSpec(220)) togetherWith fadeOut(RouteVergeMotion.tweenSpec(220)) },
+            label = "point_action_transition"
+        ) { running ->
+            if (running && runtimeSession?.kind != RuntimeSessionKind.ROUTE) {
+                RouteVergeButton(onClick = onStop, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    RouteVergeButton(onClick = onOpenPointPicker, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.Map, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("地图选点") })
+                    RouteVergeButton(onClick = onStartPoint, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.MyLocation, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("开始定点") })
+                }
+            }
         }
     }
 }
@@ -337,22 +475,45 @@ private fun RouteConfiguration(
     speedText: String,
     onSpeedTextChange: (String) -> Unit,
     onOpenRouteEditor: () -> Unit,
-    onStartRoute: () -> Unit
+    onStartRoute: () -> Unit,
+    runtimeSession: RuntimeSession?,
+    isServiceRunning: Boolean,
+    isServicePaused: Boolean,
+    onPause: () -> Unit,
+    onResumeMock: () -> Unit,
+    onStop: () -> Unit
 ) {
+    val reducedMotion = rememberRouteVergeReducedMotion()
     Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.md)) {
         SpeedSelector(speedText = speedText, onSpeedTextChange = onSpeedTextChange)
-        Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
-            RouteVergeButton(onClick = onOpenRouteEditor, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f), text = { Text("新建路线") })
-            RouteVergeButton(onClick = onStartRoute, enabled = selectedRoute != null, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("开始路线") })
+        AnimatedContent(
+            targetState = isServiceRunning || isServicePaused,
+            transitionSpec = { if (reducedMotion) fadeIn(tween(0)) togetherWith fadeOut(tween(0)) else fadeIn(RouteVergeMotion.tweenSpec(220)) togetherWith fadeOut(RouteVergeMotion.tweenSpec(220)) },
+            label = "route_action_transition"
+        ) { running ->
+            if (running && runtimeSession?.kind != RuntimeSessionKind.POINT) {
+                Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    RouteVergeButton(onClick = if (isServicePaused) onResumeMock else onPause, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f), leadingIcon = { Icon(if (isServicePaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text(if (isServicePaused) "继续模拟" else "暂停模拟") })
+                    RouteVergeButton(onClick = onStop, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    RouteVergeButton(onClick = onOpenRouteEditor, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f), text = { Text("新建路线") })
+                    RouteVergeButton(onClick = onStartRoute, enabled = selectedRoute != null, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("开始路线") })
+                }
+            }
         }
     }
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun SpeedSelector(
     speedText: String,
     onSpeedTextChange: (String) -> Unit
 ) {
+    val bringIntoViewScope = rememberCoroutineScope()
+    val speedRequester = remember { BringIntoViewRequester() }
     Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
         val currentSpeed = speedText.toDoubleOrNull()
         SpeedPreset.entries.forEach { preset ->
@@ -376,6 +537,8 @@ private fun SpeedSelector(
             modifier = Modifier
                 .weight(0.82f)
                 .height(56.dp)
+                .bringIntoViewRequester(speedRequester)
+                .onFocusChanged { if (it.isFocused) bringIntoViewScope.launch { speedRequester.bringIntoView() } }
         )
     }
 }
@@ -389,6 +552,11 @@ private fun SpeedPresetButton(
     modifier: Modifier = Modifier
 ) {
     val reducedMotion = rememberRouteVergeReducedMotion()
+    // The preset owns its interaction target. Disable the default selectable
+    // indication because it is rectangular and can bleed past the card shape.
+    // Selection is expressed solely by the animated rounded surface color.
+    val interactionSource = remember { MutableInteractionSource() }
+    val cardShape = RouteVergeShapes.medium
     val backgroundColor by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
@@ -402,9 +570,19 @@ private fun SpeedPresetButton(
     Surface(
         color = backgroundColor,
         contentColor = contentColor,
-        shape = RouteVergeShapes.medium,
+        shape = cardShape,
         border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.outline else Color.Transparent),
-        modifier = modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+        modifier = modifier
+            // Keep both the surface fill and any future interaction drawing
+            // inside the same 12dp rounded bounds.
+            .clip(cardShape)
+            .selectable(
+                selected = selected,
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.RadioButton,
+                onClick = onClick
+            )
     ) {
         Column(
             modifier = Modifier.padding(horizontal = RouteVergeSpacing.xs, vertical = RouteVergeSpacing.xs),
@@ -528,7 +706,7 @@ private fun RuntimeSurface(
 
             val pointMode = session?.kind == RuntimeSessionKind.POINT
             if (pointMode) {
-                RouteVergeButton(onClick = onStop, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
+                RouteVergeButton(onClick = onStop, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
             } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
                     RouteVergeButton(onClick = if (isServicePaused) onResumeMock else onPause, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f).graphicsLayer { scaleX = pauseContentScale; scaleY = pauseContentScale }, leadingIcon = {
@@ -542,7 +720,7 @@ private fun RuntimeSurface(
                             label = "pause_resume_label"
                         ) { paused -> Text(if (paused) "继续模拟" else "暂停模拟") }
                     })
-                    RouteVergeButton(onClick = onStop, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
+                    RouteVergeButton(onClick = onStop, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.weight(1f), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
                 }
             }
         }

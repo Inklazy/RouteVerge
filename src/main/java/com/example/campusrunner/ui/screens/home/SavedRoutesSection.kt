@@ -1,9 +1,11 @@
 package com.example.campusrunner.ui.screens.home
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -11,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,7 +29,9 @@ import com.example.campusrunner.ui.theme.RouteVergeSpacing
 
 /** Saved routes use the same fixed-height row as saved points. */
 @Composable
-fun SavedRoutesSection(
+fun SavedRoutesList(
+    modifier: Modifier,
+    listState: LazyListState,
     routes: List<SavedRoute>,
     selectedRouteId: String?,
     speedText: String,
@@ -37,22 +40,23 @@ fun SavedRoutesSection(
     onDeleteRoute: (SavedRoute) -> Unit,
     onSelectRoute: (SavedRoute) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)) {
-        HomeSectionTitle("保存路线", count = routes.size)
+    LazyColumn(
+        modifier = modifier,
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)
+    ) {
         if (routes.isEmpty()) {
-            EmptyRoutesHint()
+            item { EmptyRoutesHint() }
         } else {
-            routes.forEach { route ->
-                key(route.id) {
-                    RouteListItem(
-                        route = route,
-                        selected = route.id == selectedRouteId,
-                        onStart = { onStartRoute(route, speedText) },
-                        onEdit = { onEditRoute(route) },
-                        onDelete = { onDeleteRoute(route) },
-                        onSelect = { onSelectRoute(route) }
-                    )
-                }
+            items(routes, key = { it.id }) { route ->
+                RouteListItem(
+                    route = route,
+                    selected = route.id == selectedRouteId,
+                    onStart = { onStartRoute(route, speedText) },
+                    onEdit = { onEditRoute(route) },
+                    onDelete = { onDeleteRoute(route) },
+                    onSelect = { onSelectRoute(route) }
+                )
             }
         }
     }

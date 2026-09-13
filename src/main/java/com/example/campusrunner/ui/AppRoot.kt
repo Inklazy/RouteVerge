@@ -12,6 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -72,7 +75,33 @@ fun AppRoot(
     onSaveRoute: (String, List<RoutePoint>, Boolean, Int) -> SavedRoute?,
     onLocateMe: () -> RoutePoint?
 ) {
-    var screen by remember { mutableStateOf(AppDestination.HOME) }
+    // This is deliberately a real (small) back stack rather than a single
+    // destination flag. A route editor therefore returns to the exact Home
+    // entry it was opened from instead of relying on Home's default mode.
+    // Save the stack as a delimiter-separated path so the state registry only
+    // needs to persist a String (and never a mutable collection).
+    var backStackPath by rememberSaveable { mutableStateOf(AppDestination.HOME.name) }
+    val backStack = backStackPath.split('|')
+    val screen = AppDestination.valueOf(backStack.last())
+    fun navigateTo(destination: AppDestination) {
+        backStackPath = "$backStackPath|${destination.name}"
+    }
+    fun popBackStack() {
+        if (backStack.size > 1) backStackPath = backStack.dropLast(1).joinToString("|")
+    }
+    fun popToHome() {
+        if (backStack.size > 1) backStackPath = AppDestination.HOME.name
+    }
+
+    // Home stays the owner of its presentation state while a child screen is
+    // open. Keeping these above AnimatedContent preserves selection, preview
+    // inputs and both independent saved-record scroll positions on return.
+    var homeModeName by rememberSaveable { mutableStateOf(com.example.campusrunner.ui.screens.home.SimulationMode.POINT.name) }
+    val homeMode = com.example.campusrunner.ui.screens.home.SimulationMode.valueOf(homeModeName)
+    var selectedRouteId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedPointId by rememberSaveable { mutableStateOf<String?>(null) }
+    val pointRecordsState = rememberLazyListState()
+    val routeRecordsState = rememberLazyListState()
     var editingRoute by remember { mutableStateOf<SavedRoute?>(null) }
     var speedText by remember { mutableStateOf(formatNumber(SpeedPreset.FAST_PACE.speedMps)) }
     var closeLoop by remember { mutableStateOf(false) }
@@ -91,8 +120,8 @@ fun AppRoot(
         }
     }
 
-    BackHandler(enabled = screen != AppDestination.HOME) {
-        screen = AppDestination.HOME
+    BackHandler(enabled = backStack.size > 1) {
+        popBackStack()
     }
 
     val reducedMotion = rememberRouteVergeReducedMotion()
@@ -111,6 +140,11 @@ fun AppRoot(
                 routes = routes,
                 savedPoints = savedPoints,
                 mapProvider = mapProvider,
+                selectedRouteId = selectedRouteId,
+                selectedPointId = selectedPointId,
+                mode = homeMode,
+                pointRecordsState = pointRecordsState,
+                routeRecordsState = routeRecordsState,
                 isServiceRunning = isServiceRunning,
                 isServicePaused = isServicePaused,
                 runtimeSession = runtimeSession,
@@ -125,27 +159,30 @@ fun AppRoot(
                 onOpenDeveloperOptions = onOpenDeveloperOptions,
                 onVerifyNfc = onVerifyNfc,
                 onOpenAlipayNfc = onOpenAlipayNfc,
-                onOpenSettings = { screen = AppDestination.SETTINGS },
-                onOpenPointPicker = { pendingPointEditId = null; pendingPointName = ""; screen = AppDestination.POINT_PICKER },
+                onModeChange = { homeModeName = it.name },
+                onSelectedRouteChange = { selectedRouteId = it },
+                onSelectedPointChange = { selectedPointId = it },
+                onOpenSettings = { navigateTo(AppDestination.SETTINGS) },
+                onOpenPointPicker = { pendingPointEditId = null; pendingPointName = ""; navigateTo(AppDestination.POINT_PICKER) },
                 onEditPoint = { point ->
                     pendingPointEditId = point.id
                     pendingPointName = point.name
                     pointLatInput = String.format(Locale.US, "%.6f", point.point.latWgs84)
                     pointLngInput = String.format(Locale.US, "%.6f", point.point.lngWgs84)
-                    screen = AppDestination.POINT_PICKER
+                    navigateTo(AppDestination.POINT_PICKER)
                 },
                 onDeletePoint = onDeletePoint,
                 onOpenRouteEditor = {
                     editingRoute = null
                     closeLoop = false
                     loopCountText = "1"
-                    screen = AppDestination.ROUTE_EDITOR
+                    navigateTo(AppDestination.ROUTE_EDITOR)
                 },
                 onEditRoute = {
                     editingRoute = it
                     closeLoop = it.closeLoop
                     loopCountText = it.loopCount.toString()
-                    screen = AppDestination.ROUTE_EDITOR
+                    navigateTo(AppDestination.ROUTE_EDITOR)
                 },
                 onStartPoint = { onStartPoint(pointLatInput, pointLngInput) },
                 onStartRoute = onStartRoute,
@@ -158,7 +195,7 @@ fun AppRoot(
             AppDestination.SETTINGS -> SettingsScreen(
                 isNfcActivated = isNfcActivated,
                 nfcLinkConfigured = nfcLinkConfigured,
-                onBack = { screen = AppDestination.HOME },
+                onBack = ::popBackStack,
                 onVerifyNfc = onVerifyNfc,
                 onShowCurrentLink = onShowCurrentLinkDialog,
                 onOpenProjectHome = onOpenProjectHome
@@ -173,11 +210,11 @@ fun AppRoot(
                     isServiceRunning -> RouteVergeStatus.Running
                     else -> null
                 },
-                onRuntimeEntryClick = { screen = AppDestination.HOME },
+                onRuntimeEntryClick = ::popToHome,
                 startPoint = pointLatInput.toDoubleOrNull()?.let { lat ->
                     pointLngInput.toDoubleOrNull()?.let { lng -> RoutePoint(lat, lng) }
                 },
-                onBack = { screen = AppDestination.HOME },
+                onBack = ::popBackStack,
                 onLocateMe = onLocateMe,
                 onPointPicked = { point ->
                     pointLatInput = String.format(Locale.US, "%.6f", point.latWgs84)
@@ -196,20 +233,21 @@ fun AppRoot(
                     isServiceRunning -> RouteVergeStatus.Running
                     else -> null
                 },
-                onRuntimeEntryClick = { screen = AppDestination.HOME },
+                onRuntimeEntryClick = ::popToHome,
                 initialRoute = editingRoute,
                 closeLoop = closeLoop,
                 loopCountText = loopCountText,
                 onCloseLoopChange = { closeLoop = it },
                 onLoopCountTextChange = { loopCountText = it },
-                onBack = { screen = AppDestination.HOME },
+                onBack = ::popBackStack,
                 onLocateMe = onLocateMe,
                 onSaveRoute = { name, points ->
                     val loopCount = loopCountText.toIntOrNull() ?: 1
                     val saved = onSaveRoute(name, points, closeLoop, loopCount)
                     if (saved != null) {
                         editingRoute = saved
-                        screen = AppDestination.HOME
+                        selectedRouteId = saved.id
+                        popToHome()
                     }
                 }
             )
@@ -232,7 +270,7 @@ fun AppRoot(
                     if (saved) {
                         pendingPoint = null
                         pendingPointEditId = null
-                        screen = AppDestination.HOME
+                        popToHome()
                     }
                     }
                 }) { Text("保存") }

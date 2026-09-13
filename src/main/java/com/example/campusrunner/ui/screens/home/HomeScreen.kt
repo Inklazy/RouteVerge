@@ -1,8 +1,8 @@
 package com.example.campusrunner.ui.screens.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
@@ -13,9 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.background
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,9 +34,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.example.campusrunner.data.SavedRoute
 import com.example.campusrunner.data.SavedPoint
 import com.example.campusrunner.data.MapProvider
@@ -43,25 +49,26 @@ import com.example.campusrunner.ui.components.SavedRecordRow
 import com.example.campusrunner.ui.formatCoordinate
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
 
-// Compose Foundation compatibility: animateItem is named animateItemPlacement
-// in the resolved runtime version, while keeping one project-level call site.
-@OptIn(ExperimentalFoundationApi::class)
-private fun LazyItemScope.animateItem(): Modifier = with(this) { Modifier.animateItem() }
-
 /**
- * Home destination — scrollable status/simulation/records flow with a fixed NFC
- * tool bar owned by Scaffold.bottomBar.
+ * Home destination — fixed simulation controls with a bounded saved-record list.
+ * The NFC tool bar is owned by Scaffold.bottomBar, so it never participates in
+ * record scrolling.
  * No card stacks, no dashboard. Technical state lives in the status detail
  * (Phase 9 Settings), not on the first screen.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
+internal fun HomeScreen(
     hasLocationPermission: Boolean,
     canMockLocation: Boolean,
     routes: List<SavedRoute>,
     savedPoints: List<SavedPoint>,
     mapProvider: MapProvider,
+    selectedRouteId: String?,
+    selectedPointId: String?,
+    mode: SimulationMode,
+    pointRecordsState: LazyListState,
+    routeRecordsState: LazyListState,
     isServiceRunning: Boolean,
     isServicePaused: Boolean,
     runtimeSession: RuntimeSession?,
@@ -77,6 +84,9 @@ fun HomeScreen(
     onVerifyNfc: () -> Unit,
     onOpenAlipayNfc: () -> Unit,
     onOpenSettings: () -> Unit,
+    onModeChange: (SimulationMode) -> Unit,
+    onSelectedRouteChange: (String?) -> Unit,
+    onSelectedPointChange: (String?) -> Unit,
     onOpenPointPicker: () -> Unit,
     onOpenRouteEditor: () -> Unit,
     onEditRoute: (SavedRoute) -> Unit,
@@ -89,24 +99,28 @@ fun HomeScreen(
     onStop: () -> Unit,
     onDeleteRoute: (SavedRoute) -> Unit
 ) {
-    var selectedRouteId by remember { mutableStateOf(routes.firstOrNull()?.id) }
-    var selectedPointId by remember { mutableStateOf(savedPoints.firstOrNull()?.id) }
-    var mode by remember { mutableStateOf(SimulationMode.POINT) }
+    // Selection and scroll state are owned by AppRoot so navigating to an
+    // editor does not reset the previous Home presentation on return.
     androidx.compose.runtime.LaunchedEffect(routes) {
-        if (routes.none { it.id == selectedRouteId }) selectedRouteId = routes.firstOrNull()?.id
+        if (routes.none { it.id == selectedRouteId }) onSelectedRouteChange(routes.firstOrNull()?.id)
     }
     androidx.compose.runtime.LaunchedEffect(savedPoints) {
-        if (savedPoints.none { it.id == selectedPointId }) selectedPointId = savedPoints.firstOrNull()?.id
+        if (savedPoints.none { it.id == selectedPointId }) onSelectedPointChange(savedPoints.firstOrNull()?.id)
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            NfcToolsRow(
-                isActivated = isNfcActivated,
-                onOpenAlipay = onOpenAlipayNfc,
-                onVerify = onVerifyNfc
-            )
+            // Keep the NFC launcher fixed to the app window. Removing it while
+            // the IME is visible prevents it from being measured above the
+            // keyboard and squeezing the simulation controls.
+            if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
+                NfcToolsRow(
+                    isActivated = isNfcActivated,
+                    onOpenAlipay = onOpenAlipayNfc,
+                    onVerify = onVerifyNfc
+                )
+            }
         },
         topBar = {
             TopAppBar(
@@ -127,19 +141,27 @@ fun HomeScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .padding(horizontal = RouteVergeSpacing.lg),
-            // Scaffold contributes the measured bottom-bar inset; this extra
-            // breathing room keeps the last record clear of the fixed toolbar.
-            contentPadding = PaddingValues(bottom = RouteVergeSpacing.xxxl),
-            verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.lg)
         ) {
-            item {
-                androidx.compose.foundation.layout.Box(animateItem()) {
+            val mapHeight = responsiveMapHeight(maxHeight, LocalDensity.current.fontScale)
+            val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            Column(
+                modifier = if (imeVisible) {
+                    // Preserve designed control heights; let the page move
+                    // instead of compressing buttons when the IME resizes us.
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                } else {
+                    Modifier.fillMaxSize()
+                },
+                verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.lg)
+            ) {
                 HomeStatusSection(
                     hasLocationPermission = hasLocationPermission,
                     canMockLocation = canMockLocation,
@@ -149,17 +171,14 @@ fun HomeScreen(
                     onRequestPermissions = onRequestPermissions,
                     onOpenDeveloperOptions = onOpenDeveloperOptions,
                     onVerifyNfc = onVerifyNfc
-                ) }
-            }
-            item {
-                androidx.compose.foundation.layout.Box(animateItem()) {
+                )
                 SimulationSection(
                     routes = routes,
                     savedPoints = savedPoints,
                     mapProvider = mapProvider,
                     selectedRouteId = selectedRouteId,
                     mode = mode,
-                    onModeChange = { mode = it },
+                    onModeChange = onModeChange,
                     selectedPointId = selectedPointId,
                     runtimeSession = runtimeSession,
                     speedText = speedText,
@@ -176,41 +195,81 @@ fun HomeScreen(
                     onStartRoute = onStartRoute,
                     onPause = onPause,
                     onResumeMock = onResumeMock,
-                    onStop = onStop
-                ) }
-            }
-            if (mode == SimulationMode.ROUTE) item {
-                androidx.compose.foundation.layout.Box(animateItem()) {
-                SavedRoutesSection(
-                    routes = routes,
-                    selectedRouteId = selectedRouteId,
-                    speedText = speedText,
-                    onStartRoute = onStartRoute,
-                    onEditRoute = onEditRoute,
-                    onDeleteRoute = onDeleteRoute,
-                    onSelectRoute = { selectedRouteId = it.id }
-                ) }
-            }
-            if (mode == SimulationMode.POINT) item {
-                androidx.compose.foundation.layout.Box(animateItem()) {
-                    SavedPointsSection(savedPoints, selectedPointId, onPointLatChange, onPointLngChange, onEditPoint, { id ->
-                        if (selectedPointId == id) selectedPointId = savedPoints.firstOrNull { it.id != id }?.id
+                    onStop = onStop,
+                    mapHeight = mapHeight
+                )
+                if (mode == SimulationMode.ROUTE) {
+                    HomeSectionTitle("保存路线", routes.size)
+                    SavedRoutesList(
+                        modifier = if (imeVisible) Modifier.fillMaxWidth().heightIn(max = 200.dp)
+                        else Modifier.fillMaxWidth().weight(1f),
+                        listState = routeRecordsState,
+                        routes = routes,
+                        selectedRouteId = selectedRouteId,
+                        speedText = speedText,
+                        onStartRoute = onStartRoute,
+                        onEditRoute = onEditRoute,
+                        onDeleteRoute = onDeleteRoute,
+                        onSelectRoute = { onSelectedRouteChange(it.id) }
+                    )
+                } else {
+                    HomeSectionTitle("保存点位", savedPoints.size)
+                    SavedPointsList(
+                        modifier = if (imeVisible) Modifier.fillMaxWidth().heightIn(max = 200.dp)
+                        else Modifier.fillMaxWidth().weight(1f),
+                        listState = pointRecordsState,
+                        points = savedPoints,
+                        selectedId = selectedPointId,
+                        onLatChange = onPointLatChange,
+                        onLngChange = onPointLngChange,
+                        onEdit = onEditPoint,
+                        onDelete = { id ->
+                        if (selectedPointId == id) onSelectedPointChange(savedPoints.firstOrNull { it.id != id }?.id)
                         onDeletePoint(id)
-                    }) { selectedPointId = it }
+                        },
+                        onSelect = onSelectedPointChange
+                    )
                 }
             }
         }
     }
 }
+
+/** Leaves a usable bounded history viewport on compact displays and large text. */
+private fun responsiveMapHeight(availableHeight: androidx.compose.ui.unit.Dp, fontScale: Float) = when {
+    availableHeight < 560.dp || fontScale >= 1.35f -> 112.dp
+    availableHeight < 640.dp || fontScale >= 1.15f -> 144.dp
+    availableHeight < 720.dp -> 176.dp
+    else -> 220.dp
+}
+
 @Composable
-private fun SavedPointsSection(points: List<SavedPoint>, selectedId: String?, onLatChange: (String) -> Unit, onLngChange: (String) -> Unit, onEdit: (SavedPoint) -> Unit, onDelete: (String) -> Unit, onSelect: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)) {
-        HomeSectionTitle("保存点位", points.size)
+private fun SavedPointsList(
+    modifier: Modifier,
+    listState: LazyListState,
+    points: List<SavedPoint>,
+    selectedId: String?,
+    onLatChange: (String) -> Unit,
+    onLngChange: (String) -> Unit,
+    onEdit: (SavedPoint) -> Unit,
+    onDelete: (String) -> Unit,
+    onSelect: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = modifier,
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)
+    ) {
         if (points.isEmpty()) {
-            Text("暂无保存点位，请通过“地图选点”添加", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            item {
+                Text(
+                    "暂无保存点位，请通过“地图选点”添加",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        points.forEach { point ->
-            key(point.id) {
+        items(points, key = { it.id }) { point ->
             var confirmDelete by remember { mutableStateOf(false) }
             SavedRecordRow(
                 record = PointRecord(point, "${formatCoordinate(point.point.latWgs84)}, ${formatCoordinate(point.point.lngWgs84)}"),
@@ -233,7 +292,6 @@ private fun SavedPointsSection(points: List<SavedPoint>, selectedId: String?, on
                     confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = false; onDelete(point.id) }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
                     dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = false }) { Text("取消") } }
                 )
-            }
             }
         }
     }

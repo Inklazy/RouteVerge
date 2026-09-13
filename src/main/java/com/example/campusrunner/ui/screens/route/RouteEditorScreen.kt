@@ -97,7 +97,7 @@ fun RouteEditorScreen(
 
     val undoPoints: () -> Unit = {
         val removeCount = points.size.coerceAtMost(8)
-        repeat(removeCount) { points.removeLast() }
+        repeat(removeCount) { if (points.isNotEmpty()) points.removeAt(points.lastIndex) }
         pointsVersion++
     }
 

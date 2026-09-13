@@ -14,6 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -77,7 +82,7 @@ fun StatusDot(
     val reducedMotion = rememberRouteVergeReducedMotion()
     val color by androidx.compose.animation.animateColorAsState(
         targetValue = status.vividColor(),
-        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        animationSpec = RouteVergeMotion.spec(reducedMotion, 320),
         label = "status_dot_color"
     )
     Box(
@@ -89,6 +94,7 @@ fun StatusDot(
 
 /** Pill-shaped status badge: label + optional icon (default dot) on a soft container. */
 @Composable
+@OptIn(ExperimentalAnimationApi::class)
 fun StatusBadge(
     label: String,
     status: RouteVergeStatus,
@@ -100,12 +106,12 @@ fun StatusBadge(
     val reducedMotion = rememberRouteVergeReducedMotion()
     val animatedContainer by androidx.compose.animation.animateColorAsState(
         targetValue = status.containerColor(),
-        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        animationSpec = RouteVergeMotion.spec(reducedMotion, 320),
         label = "status_badge_container"
     )
     val animatedContent by androidx.compose.animation.animateColorAsState(
         targetValue = status.onContainerColor(),
-        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        animationSpec = RouteVergeMotion.spec(reducedMotion, 320),
         label = "status_badge_content"
     )
     Surface(
@@ -129,7 +135,11 @@ fun StatusBadge(
             } else {
                 StatusDot(status, animated = true)
             }
-            Text(label, style = textStyle)
+            AnimatedContent(
+                targetState = label,
+                transitionSpec = { if (reducedMotion) fadeIn(RouteVergeMotion.spec(true)) togetherWith fadeOut(RouteVergeMotion.spec(true)) else fadeIn(RouteVergeMotion.tweenSpec(280)) togetherWith fadeOut(RouteVergeMotion.tweenSpec(180)) },
+                label = "status_badge_label"
+            ) { text -> Text(text, style = textStyle) }
         }
     }
 }
