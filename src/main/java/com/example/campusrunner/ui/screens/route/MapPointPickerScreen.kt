@@ -22,6 +22,7 @@ import com.example.campusrunner.ui.components.RouteVergeButton
 import com.example.campusrunner.ui.components.RouteVergeStatus
 import com.example.campusrunner.ui.theme.RouteVergeShapes
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
+import com.example.campusrunner.ui.theme.RouteVergeIconSizes
 
 /**
  * Pick a single point: move the map, keep the fixed center target on the
@@ -79,7 +80,7 @@ fun MapPointPickerScreen(
                     RouteVergeButton(
                         onClick = { controller.cameraTarget()?.let(onPointPicked) },
                         modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) },
                         text = { Text("确认此位置") }
                     )
                 }

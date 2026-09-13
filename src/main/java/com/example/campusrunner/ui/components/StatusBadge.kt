@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.example.campusrunner.ui.theme.RouteVergeShapes
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
 import com.example.campusrunner.ui.theme.RouteVergeTheme
+import com.example.campusrunner.ui.theme.RouteVergeMotion
+import com.example.campusrunner.ui.theme.rememberRouteVergeReducedMotion
 
 /**
  * Unified semantic status set (AGENTS.md §15). Color is never the only
@@ -68,12 +71,19 @@ private fun RouteVergeStatus.onContainerColor(): Color = when (this) {
 fun StatusDot(
     status: RouteVergeStatus,
     modifier: Modifier = Modifier,
-    size: Dp = 8.dp
+    size: Dp = 8.dp,
+    animated: Boolean = false
 ) {
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    val color by androidx.compose.animation.animateColorAsState(
+        targetValue = status.vividColor(),
+        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        label = "status_dot_color"
+    )
     Box(
         modifier = modifier
             .size(size)
-            .background(status.vividColor(), CircleShape)
+            .background(if (animated) color else status.vividColor(), CircleShape)
     )
 }
 
@@ -87,9 +97,20 @@ fun StatusBadge(
     icon: (@Composable () -> Unit)? = null,
     textStyle: TextStyle = MaterialTheme.typography.labelLarge
 ) {
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    val animatedContainer by androidx.compose.animation.animateColorAsState(
+        targetValue = status.containerColor(),
+        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        label = "status_badge_container"
+    )
+    val animatedContent by androidx.compose.animation.animateColorAsState(
+        targetValue = status.onContainerColor(),
+        animationSpec = RouteVergeMotion.spec(reducedMotion),
+        label = "status_badge_content"
+    )
     Surface(
-        color = status.containerColor(),
-        contentColor = status.onContainerColor(),
+        color = animatedContainer,
+        contentColor = animatedContent,
         shape = RouteVergeShapes.pill,
         modifier = modifier.then(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
@@ -106,7 +127,7 @@ fun StatusBadge(
             if (icon != null) {
                 icon()
             } else {
-                StatusDot(status)
+                StatusDot(status, animated = true)
             }
             Text(label, style = textStyle)
         }

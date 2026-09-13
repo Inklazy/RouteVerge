@@ -6,18 +6,27 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.campusrunner.ui.theme.RouteVergeShapes
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
+import com.example.campusrunner.ui.theme.RouteVergeMotion
+import com.example.campusrunner.ui.theme.rememberRouteVergeReducedMotion
 
 /**
  * RouteVerge button — wraps Material 3 buttons with the RouteVerge look.
@@ -31,7 +40,7 @@ import com.example.campusrunner.ui.theme.RouteVergeSpacing
  * The wrapper only decides appearance (shape, min height, padding, icon
  * spacing, loading); screens decide content and layout.
  */
-enum class RouteVergeButtonVariant { Filled, Tonal, Outlined, Text }
+enum class RouteVergeButtonVariant { Filled, Tonal, Outlined, Text, DestructiveText }
 
 object RouteVergeButtonDefaults {
     /** DESIGN.md §29 — comfortable touch target. */
@@ -53,11 +62,25 @@ fun RouteVergeButton(
     variant: RouteVergeButtonVariant = RouteVergeButtonVariant.Filled,
     loading: Boolean = false,
     contentPadding: PaddingValues = RouteVergeButtonDefaults.ContentPadding,
+    shape: Shape? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
     text: @Composable () -> Unit
 ) {
-    val buttonModifier = modifier.defaultMinSize(minHeight = RouteVergeButtonDefaults.MinHeight)
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (pressed && enabled && !loading) 0.96f else 1f,
+        animationSpec = RouteVergeMotion.spec(reducedMotion, RouteVergeMotion.buttonPressDuration),
+        label = "button_press_scale"
+    )
+    val buttonModifier = modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .defaultMinSize(minHeight = RouteVergeButtonDefaults.MinHeight)
     val content: @Composable RowScope.() -> Unit = {
         if (loading) {
             // Loading keeps the label visible: [spinner] text
@@ -87,8 +110,9 @@ fun RouteVergeButton(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = interactive,
-            shape = RouteVergeShapes.large,
+            shape = shape ?: RouteVergeShapes.pill,
             contentPadding = contentPadding,
+            interactionSource = interactionSource,
             content = content
         )
 
@@ -96,9 +120,10 @@ fun RouteVergeButton(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = interactive,
-            shape = RouteVergeShapes.large,
+            shape = shape ?: RouteVergeShapes.large,
             contentPadding = contentPadding,
             colors = ButtonDefaults.filledTonalButtonColors(),
+            interactionSource = interactionSource,
             content = content
         )
 
@@ -106,8 +131,9 @@ fun RouteVergeButton(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = interactive,
-            shape = RouteVergeShapes.large,
+            shape = shape ?: RouteVergeShapes.large,
             contentPadding = contentPadding,
+            interactionSource = interactionSource,
             content = content
         )
 
@@ -115,6 +141,18 @@ fun RouteVergeButton(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = interactive,
+            interactionSource = interactionSource,
+            content = content
+        )
+
+        RouteVergeButtonVariant.DestructiveText -> TextButton(
+            onClick = onClick,
+            modifier = buttonModifier,
+            enabled = interactive,
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            ),
+            interactionSource = interactionSource,
             content = content
         )
     }

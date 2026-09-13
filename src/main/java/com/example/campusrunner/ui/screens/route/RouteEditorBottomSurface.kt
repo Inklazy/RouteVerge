@@ -2,16 +2,19 @@ package com.example.campusrunner.ui.screens.route
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,19 +23,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import com.example.campusrunner.ui.components.RouteVergeButton
 import com.example.campusrunner.ui.components.RouteVergeButtonVariant
-import com.example.campusrunner.ui.components.RouteVergeCard
-import com.example.campusrunner.ui.components.RouteVergeCardVariant
 import com.example.campusrunner.ui.components.RouteVergeIconButton
 import com.example.campusrunner.ui.components.RouteVergeIconButtonVariant
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
+import com.example.campusrunner.ui.theme.RouteVergeShapes
 
 /**
  * Mode-driven compact bottom action surface for the route editor.
  * Only the actions relevant to the current task are exposed:
- *  - empty idle: start drawing
+ *  - empty idle: choose a route creation method (free drawing or track template)
  *  - drawing: undo / finish drawing
  *  - route exists: continue drawing / undo / save + overflow (loop, template, clear)
  *  - template: cancel / apply template
@@ -60,14 +65,19 @@ fun RouteEditorBottomSurface(
     var overflowExpanded by remember { mutableStateOf(false) }
     val loopSummary = if (closeLoop) "闭环 " + (loopCountText.toIntOrNull()?.coerceAtLeast(1) ?: 1) + " 圈" else "往返"
 
-    RouteVergeCard(
-        variant = RouteVergeCardVariant.Elevated,
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = com.example.campusrunner.ui.theme.RouteVergeShapes.large,
+        tonalElevation = 0.dp,
+        shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(RouteVergeSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.md)
-        ) {
+        BoxWithConstraints {
+            val stackActions = maxWidth < 270.dp || LocalDensity.current.fontScale >= 1.5f
+            Column(
+                modifier = Modifier.padding(RouteVergeSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.md)
+            ) {
             when {
                 templateEnabled -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -78,19 +88,22 @@ fun RouteEditorBottomSurface(
                             modifier = Modifier.weight(1f)
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
-                        RouteVergeButton(
+                    AdaptiveActionPair(
+                        stacked = stackActions,
+                        first = { actionModifier -> RouteVergeButton(
                             onClick = onCancelTemplate,
                             variant = RouteVergeButtonVariant.Outlined,
-                            modifier = Modifier.weight(1f),
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
                             text = { Text("取消模板") }
-                        )
-                        RouteVergeButton(
+                        ) },
+                        second = { actionModifier -> RouteVergeButton(
                             onClick = onApplyTemplate,
-                            modifier = Modifier.weight(1f),
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
                             text = { Text("应用模板") }
-                        )
-                    }
+                        ) }
+                    )
                 }
 
                 drawMode -> {
@@ -98,23 +111,28 @@ fun RouteEditorBottomSurface(
                         Text(
                             "绘制中 · " + pointCount + " 点 · " + distanceText,
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
-                        RouteVergeButton(
+                    AdaptiveActionPair(
+                        stacked = stackActions,
+                        first = { actionModifier -> RouteVergeButton(
                             onClick = onUndo,
                             enabled = pointCount > 0,
                             variant = RouteVergeButtonVariant.Outlined,
-                            modifier = Modifier.weight(1f),
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
                             text = { Text("撤销") }
-                        )
-                        RouteVergeButton(
+                        ) },
+                        second = { actionModifier -> RouteVergeButton(
                             onClick = onDoneDrawing,
-                            modifier = Modifier.weight(1f),
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
                             text = { Text("完成绘制") }
-                        )
-                    }
+                        ) }
+                    )
                 }
 
                 pointCount == 0 -> {
@@ -126,10 +144,21 @@ fun RouteEditorBottomSurface(
                             modifier = Modifier.weight(1f)
                         )
                     }
-                    RouteVergeButton(
-                        onClick = onStartDrawing,
-                        modifier = Modifier.fillMaxWidth(),
-                        text = { Text("开始绘制") }
+                    AdaptiveActionPair(
+                        stacked = stackActions,
+                        first = { actionModifier -> RouteVergeButton(
+                            onClick = onStartDrawing,
+                            variant = RouteVergeButtonVariant.Tonal,
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
+                            text = { Text("绘制线条") }
+                        ) },
+                        second = { actionModifier -> RouteVergeButton(
+                            onClick = onOpenTemplate,
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
+                            text = { Text("添加跑道") }
+                        ) }
                     )
                 }
 
@@ -138,8 +167,18 @@ fun RouteEditorBottomSurface(
                         Text(
                             pointCount.toString() + " 点 · " + distanceText + " · " + loopSummary,
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        RouteVergeIconButton(
+                            onClick = onUndo,
+                            enabled = pointCount > 0,
+                            variant = if (pointCount > 0) RouteVergeIconButtonVariant.Floating else RouteVergeIconButtonVariant.Plain,
+                            contentDescription = "撤销"
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null)
+                        }
                         Box {
                             RouteVergeIconButton(
                                 onClick = { overflowExpanded = true },
@@ -180,29 +219,46 @@ fun RouteEditorBottomSurface(
                             }
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
-                        RouteVergeButton(
+                    AdaptiveActionPair(
+                        stacked = stackActions,
+                        first = { actionModifier -> RouteVergeButton(
                             onClick = onContinueDrawing,
                             variant = RouteVergeButtonVariant.Tonal,
-                            modifier = Modifier.weight(1f),
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
                             text = { Text("继续绘制") }
-                        )
-                        RouteVergeButton(
-                            onClick = onUndo,
-                            enabled = pointCount > 0,
-                            variant = RouteVergeButtonVariant.Outlined,
-                            modifier = Modifier.weight(1f),
-                            text = { Text("撤销") }
-                        )
-                        RouteVergeButton(
+                        ) },
+                        second = { actionModifier -> RouteVergeButton(
                             onClick = onSave,
                             enabled = canSave,
-                            modifier = Modifier.weight(1f),
+                            modifier = actionModifier,
+                            shape = RouteVergeShapes.large,
                             text = { Text("保存路线") }
-                        )
-                    }
+                        ) }
+                    )
                 }
             }
+        }
+    }
+}
+
+}
+
+@Composable
+private fun AdaptiveActionPair(
+    stacked: Boolean,
+    first: @Composable (Modifier) -> Unit,
+    second: @Composable (Modifier) -> Unit
+) {
+    if (stacked) {
+        Column(verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
+            first(Modifier.fillMaxWidth())
+            second(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
+            first(Modifier.weight(1f))
+            second(Modifier.weight(1f))
         }
     }
 }

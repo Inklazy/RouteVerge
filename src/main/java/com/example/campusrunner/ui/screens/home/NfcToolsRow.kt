@@ -24,6 +24,7 @@ import com.example.campusrunner.ui.components.RouteVergeStatus
 import com.example.campusrunner.ui.components.StatusDot
 import com.example.campusrunner.ui.theme.RouteVergeShapes
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
+import com.example.campusrunner.ui.theme.RouteVergeIconSizes
 import com.example.campusrunner.ui.theme.RouteVergeTheme
 
 /**
@@ -51,7 +52,7 @@ fun NfcToolsRow(
                 Icons.Rounded.Nfc,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(RouteVergeIconSizes.medium)
             )
             Spacer(Modifier.width(RouteVergeSpacing.md))
             Column(Modifier.weight(1f)) {

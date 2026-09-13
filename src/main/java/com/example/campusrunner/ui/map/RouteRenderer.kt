@@ -2,6 +2,7 @@ package com.example.campusrunner.ui.map
 
 import com.example.campusrunner.data.RoutePoint
 import com.example.campusrunner.ui.theme.RouteVergeBrand
+import com.example.campusrunner.ui.theme.RouteVergeMapTokens
 
 /**
  * Renders a route (polyline + markers) onto a [MapController].
@@ -23,7 +24,7 @@ internal fun renderRoute(
     // Committed route line — the primary visual (brand blue, ~8f).
     if (points.size >= 2) {
         val visiblePoints = if (closeLoopPreview) points + points.first() else points
-        controller.addPolyline(visiblePoints, android.graphics.Color.parseColor(RouteVergeBrand.PrimaryHex), 8f)
+        controller.addPolyline(visiblePoints, android.graphics.Color.parseColor(RouteVergeBrand.PrimaryHex), RouteVergeMapTokens.routeStrokeWidth)
     }
 
     // Semantic markers only — never a marker per sampled point.
@@ -54,7 +55,7 @@ internal fun renderRoute(
     // consistent across AMap / Google, so unified opacity wins).
     if (previewPoints.size >= 2) {
         val previewColor =
-            (android.graphics.Color.parseColor(RouteVergeBrand.SuccessHex) and 0x00FFFFFF) or (0xB3 shl 24)
-        controller.addPolyline(previewPoints + previewPoints.first(), previewColor, 6f)
+            (android.graphics.Color.parseColor(RouteVergeBrand.SuccessHex) and 0x00FFFFFF) or (RouteVergeMapTokens.secondaryRouteAlpha shl 24)
+        controller.addPolyline(previewPoints + previewPoints.first(), previewColor, RouteVergeMapTokens.previewRouteStrokeWidth)
     }
 }

@@ -24,6 +24,8 @@ import com.example.campusrunner.data.LocationCache
 import com.example.campusrunner.data.MapProvider
 import com.example.campusrunner.data.RoutePoint
 import com.example.campusrunner.data.RouteRepository
+import com.example.campusrunner.data.PointRepository
+import com.example.campusrunner.data.SavedPoint
 import com.example.campusrunner.data.SavedRoute
 import com.example.campusrunner.data.UserSettings
 import com.example.campusrunner.geo.RouteMath
@@ -67,6 +69,7 @@ private enum class StartupPhase {
  */
 class MainActivity : ComponentActivity() {
     private lateinit var repository: RouteRepository
+    private lateinit var pointRepository: PointRepository
     private lateinit var userSettings: UserSettings
     private lateinit var nfcLauncher: NfcLauncherController
 
@@ -79,6 +82,7 @@ class MainActivity : ComponentActivity() {
     private var hasLocationPermissionState = mutableStateOf(false)
     private var canMockState = mutableStateOf(false)
     private var routesState = mutableStateOf<List<SavedRoute>>(emptyList())
+    private var pointsState = mutableStateOf<List<SavedPoint>>(emptyList())
     private var mapProviderState = mutableStateOf(MapProvider.AUTO)
     private var serviceRunningState = mutableStateOf(false)
     private var servicePausedState = mutableStateOf(false)
@@ -94,9 +98,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         repository = RouteRepository(this)
+        pointRepository = PointRepository(this)
         userSettings = UserSettings(this)
         nfcLauncher = NfcLauncherController(this, ::refreshNfcState)
         routesState.value = repository.getRoutes()
+        pointsState.value = pointRepository.getPoints()
         mapProviderState.value = userSettings.mapProvider
         refreshState()
         nfcLauncher.onCreate()
@@ -114,6 +120,7 @@ class MainActivity : ComponentActivity() {
                     hasLocationPermission = hasLocationPermissionState.value,
                     canMockLocation = canMockState.value,
                     routes = routesState.value,
+                    savedPoints = pointsState.value,
                     mapProvider = mapProviderState.value,
                     onMapProviderChange = { provider ->
                         userSettings.mapProvider = provider
@@ -137,6 +144,9 @@ class MainActivity : ComponentActivity() {
                     onResumeMock = ::resumeMocking,
                     onStop = ::stopMocking,
                     onDeleteRoute = ::deleteRoute,
+                    onSavePoint = ::savePoint,
+                    onUpdatePoint = ::updatePoint,
+                    onDeletePoint = ::deletePoint,
                     onSaveRoute = ::saveRoute,
                     onLocateMe = ::lastKnownRoutePoint
                 )
@@ -281,6 +291,7 @@ class MainActivity : ComponentActivity() {
         serviceRunningState.value = MockLocationService.isRunning
         servicePausedState.value = MockLocationService.isPaused
         routesState.value = repository.getRoutes()
+        pointsState.value = pointRepository.getPoints()
         refreshNfcState()
     }
 
@@ -415,6 +426,32 @@ class MainActivity : ComponentActivity() {
     private fun deleteRoute(route: SavedRoute) {
         repository.deleteRoute(route.id)
         routesState.value = repository.getRoutes()
+    }
+
+    private fun savePoint(name: String?, latText: String, lngText: String): Boolean {
+        val lat = latText.toDoubleOrNull(); val lng = lngText.toDoubleOrNull()
+        if (lat == null || lng == null || lat !in -90.0..90.0 || lng !in -180.0..180.0) {
+            Toast.makeText(this, "请输入有效经纬度", Toast.LENGTH_SHORT).show(); return false
+        }
+        pointRepository.savePoint(name, RoutePoint(lat, lng))
+        pointsState.value = pointRepository.getPoints()
+        Toast.makeText(this, "点位已保存", Toast.LENGTH_SHORT).show()
+        return true
+    }
+
+    private fun updatePoint(id: String, name: String?, latText: String, lngText: String): Boolean {
+        val lat = latText.toDoubleOrNull(); val lng = lngText.toDoubleOrNull()
+        if (lat == null || lng == null || lat !in -90.0..90.0 || lng !in -180.0..180.0) {
+            Toast.makeText(this, "请输入有效经纬度", Toast.LENGTH_SHORT).show(); return false
+        }
+        if (pointRepository.updatePoint(id, name, RoutePoint(lat, lng)) == null) return false
+        pointsState.value = pointRepository.getPoints()
+        Toast.makeText(this, "点位已更新", Toast.LENGTH_SHORT).show()
+        return true
+    }
+
+    private fun deletePoint(id: String) {
+        if (pointRepository.deletePoint(id)) pointsState.value = pointRepository.getPoints()
     }
 
     @SuppressLint("MissingPermission")

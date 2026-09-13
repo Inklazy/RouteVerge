@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.campusrunner.nfc.NfcLauncherController
+import com.example.campusrunner.ui.components.RouteVergeButton
+import com.example.campusrunner.ui.components.RouteVergeButtonVariant
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
 
 @Composable
@@ -54,9 +55,10 @@ fun UpdateCheckFailedDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onRetry) {
-                Text("重新检查")
-            }
+            RouteVergeButton(
+                onClick = onRetry,
+                variant = RouteVergeButtonVariant.Filled
+            ) { Text("重新检查") }
         },
         dismissButton = {
             TextButton(onClick = onContinue) {
@@ -91,9 +93,10 @@ fun ForceUpdateDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onOpenRelease) {
-                Text("前往 GitHub")
-            }
+            RouteVergeButton(
+                onClick = onOpenRelease,
+                variant = RouteVergeButtonVariant.Filled
+            ) { Text("前往 GitHub") }
         },
         dismissButton = {
             TextButton(onClick = onRetry) {
@@ -124,9 +127,10 @@ fun StartupAgreementDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onAccept) {
-                Text("确认并进入")
-            }
+            RouteVergeButton(
+                onClick = onAccept,
+                variant = RouteVergeButtonVariant.Filled
+            ) { Text("确认并进入") }
         },
         dismissButton = {
             TextButton(onClick = onExit) {

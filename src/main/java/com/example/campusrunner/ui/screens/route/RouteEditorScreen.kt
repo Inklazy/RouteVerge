@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.AlertDialog
@@ -35,11 +38,15 @@ import com.example.campusrunner.data.RoutePoint
 import com.example.campusrunner.data.SavedRoute
 import com.example.campusrunner.geo.RouteMath
 import com.example.campusrunner.geo.buildTrackOval
+import com.example.campusrunner.ui.components.RouteVergeButton
+import com.example.campusrunner.ui.components.RouteVergeButtonVariant
 import com.example.campusrunner.ui.components.RouteVergeStatus
 import com.example.campusrunner.ui.components.RouteVergeTextField
 import com.example.campusrunner.ui.formatDistance
 import com.example.campusrunner.ui.map.MapController
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
+import com.example.campusrunner.ui.theme.RouteVergeIconSizes
+import com.example.campusrunner.ui.theme.RouteVergeShapes
 
 /**
  * Route drawing editor. Modes are mutually exclusive:
@@ -229,7 +236,7 @@ fun RouteEditorScreen(
                         onSaveRoute(name, points.toList())
                     }
                 }) {
-                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard))
                     Spacer(Modifier.width(RouteVergeSpacing.xs))
                     Text("保存")
                 }
@@ -252,7 +259,11 @@ private fun LoopSettingsSheet(
     onLoopCountTextChange: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RouteVergeShapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
         // Local editing state: only valid values (>= 1) propagate to the app
         // state, so the shown value always equals what gets saved.
         var localCount by remember { mutableStateOf(loopCountText) }
@@ -268,6 +279,8 @@ private fun LoopSettingsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = RouteVergeSpacing.lg)
                 .padding(bottom = RouteVergeSpacing.xxl),
             verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.md)
@@ -309,9 +322,10 @@ private fun ClearRouteDialog(
         title = { Text("清空路线？") },
         text = { Text("这会移除当前未保存的所有路线点。") },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("清空", color = MaterialTheme.colorScheme.error)
-            }
+            RouteVergeButton(
+                onClick = onConfirm,
+                variant = RouteVergeButtonVariant.DestructiveText
+            ) { Text("清空") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {

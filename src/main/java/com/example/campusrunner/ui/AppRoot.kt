@@ -5,8 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,9 +12,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import com.example.campusrunner.data.MapProvider
 import com.example.campusrunner.data.RoutePoint
 import com.example.campusrunner.data.SavedRoute
+import com.example.campusrunner.data.SavedPoint
 import com.example.campusrunner.data.SpeedPreset
 import com.example.campusrunner.ui.components.RouteVergeStatus
 import com.example.campusrunner.ui.navigation.AppDestination
@@ -26,6 +30,8 @@ import com.example.campusrunner.ui.screens.settings.SettingsScreen
 import com.example.campusrunner.ui.screens.route.RouteEditorScreen
 import kotlinx.coroutines.delay
 import java.util.Locale
+import com.example.campusrunner.ui.theme.RouteVergeMotion
+import com.example.campusrunner.ui.theme.rememberRouteVergeReducedMotion
 
 /**
  * App composition root: owns navigation state (which destination is shown),
@@ -39,6 +45,7 @@ fun AppRoot(
     hasLocationPermission: Boolean,
     canMockLocation: Boolean,
     routes: List<SavedRoute>,
+    savedPoints: List<SavedPoint>,
     mapProvider: MapProvider,
     onMapProviderChange: (MapProvider) -> Unit,
     isServiceRunning: Boolean,
@@ -59,6 +66,9 @@ fun AppRoot(
     onResumeMock: () -> Unit,
     onStop: () -> Unit,
     onDeleteRoute: (SavedRoute) -> Unit,
+    onSavePoint: (String?, String, String) -> Boolean,
+    onUpdatePoint: (String, String?, String, String) -> Boolean,
+    onDeletePoint: (String) -> Unit,
     onSaveRoute: (String, List<RoutePoint>, Boolean, Int) -> SavedRoute?,
     onLocateMe: () -> RoutePoint?
 ) {
@@ -69,6 +79,10 @@ fun AppRoot(
     var loopCountText by remember { mutableStateOf("1") }
     var pointLatInput by remember { mutableStateOf("39.904200") }
     var pointLngInput by remember { mutableStateOf("116.407400") }
+    var pendingPoint by remember { mutableStateOf<RoutePoint?>(null) }
+    var pendingPointName by remember { mutableStateOf("") }
+    var pendingPointEditId by remember { mutableStateOf<String?>(null) }
+    var savingPoint by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -81,14 +95,12 @@ fun AppRoot(
         screen = AppDestination.HOME
     }
 
+    val reducedMotion = rememberRouteVergeReducedMotion()
     AnimatedContent(
         targetState = screen,
         transitionSpec = {
-            if (targetState == AppDestination.HOME) {
-                slideInHorizontally { -it / 4 } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
-            } else {
-                slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it / 4 } + fadeOut()
-            }
+            if (reducedMotion) fadeIn(androidx.compose.animation.core.tween(0)) togetherWith fadeOut(androidx.compose.animation.core.tween(0))
+            else fadeIn(RouteVergeMotion.tweenSpec(RouteVergeMotion.contentDuration)) togetherWith fadeOut(RouteVergeMotion.tweenSpec(RouteVergeMotion.contentDuration))
         },
         label = "screen_transition"
     ) { target ->
@@ -97,6 +109,8 @@ fun AppRoot(
                 hasLocationPermission = hasLocationPermission,
                 canMockLocation = canMockLocation,
                 routes = routes,
+                savedPoints = savedPoints,
+                mapProvider = mapProvider,
                 isServiceRunning = isServiceRunning,
                 isServicePaused = isServicePaused,
                 runtimeSession = runtimeSession,
@@ -112,7 +126,15 @@ fun AppRoot(
                 onVerifyNfc = onVerifyNfc,
                 onOpenAlipayNfc = onOpenAlipayNfc,
                 onOpenSettings = { screen = AppDestination.SETTINGS },
-                onOpenPointPicker = { screen = AppDestination.POINT_PICKER },
+                onOpenPointPicker = { pendingPointEditId = null; pendingPointName = ""; screen = AppDestination.POINT_PICKER },
+                onEditPoint = { point ->
+                    pendingPointEditId = point.id
+                    pendingPointName = point.name
+                    pointLatInput = String.format(Locale.US, "%.6f", point.point.latWgs84)
+                    pointLngInput = String.format(Locale.US, "%.6f", point.point.lngWgs84)
+                    screen = AppDestination.POINT_PICKER
+                },
+                onDeletePoint = onDeletePoint,
                 onOpenRouteEditor = {
                     editingRoute = null
                     closeLoop = false
@@ -160,7 +182,8 @@ fun AppRoot(
                 onPointPicked = { point ->
                     pointLatInput = String.format(Locale.US, "%.6f", point.latWgs84)
                     pointLngInput = String.format(Locale.US, "%.6f", point.lngWgs84)
-                    screen = AppDestination.HOME
+                    pendingPoint = point
+                    if (pendingPointEditId == null) pendingPointName = ""
                 }
             )
 
@@ -191,5 +214,30 @@ fun AppRoot(
                 }
             )
         }
+    }
+
+    pendingPoint?.let { _ ->
+        AlertDialog(
+            onDismissRequest = { if (!savingPoint) { pendingPoint = null; pendingPointEditId = null } },
+            title = { Text(if (pendingPointEditId == null) "保存点位" else "更新点位") },
+            text = { OutlinedTextField(value = pendingPointName, onValueChange = { pendingPointName = it }, label = { Text("名称（可选）") }, singleLine = true) },
+            confirmButton = {
+                Button(enabled = !savingPoint, onClick = {
+                    if (!savingPoint) {
+                    savingPoint = true
+                    val saved = pendingPointEditId?.let { id ->
+                        onUpdatePoint(id, pendingPointName, pointLatInput, pointLngInput)
+                    } ?: onSavePoint(pendingPointName, pointLatInput, pointLngInput)
+                    savingPoint = false
+                    if (saved) {
+                        pendingPoint = null
+                        pendingPointEditId = null
+                        screen = AppDestination.HOME
+                    }
+                    }
+                }) { Text("保存") }
+            },
+            dismissButton = { TextButton(enabled = !savingPoint, onClick = { pendingPoint = null; pendingPointEditId = null }) { Text("取消") } }
+        )
     }
 }

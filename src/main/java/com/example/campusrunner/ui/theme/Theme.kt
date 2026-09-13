@@ -56,13 +56,35 @@ object RouteVergeSpacing {
     val xxxl = 32.dp
 }
 
+/** Common sizes for ordinary UI icons. Map and SDK drawing sizes stay local. */
+object RouteVergeIconSizes {
+    val small = 16.dp
+    val standard = 18.dp
+    val medium = 20.dp
+    val large = 24.dp
+}
+
+/** Visual constants for overlays and route strokes rendered on map canvases. */
+object RouteVergeMapTokens {
+    val crosshairSize = 34.dp
+    val crosshairArmLength = 28.dp
+    val crosshairStrokeWidth = 3.dp
+    val crosshairShadowElevation = 2.dp
+    val crosshairForeground = Color(0xFFFFFFFF)
+    val crosshairShadow = Color(0x99000000)
+
+    const val routeStrokeWidth = 8f
+    const val previewRouteStrokeWidth = 6f
+    const val secondaryRouteAlpha = 0xB3
+}
+
 // ===== Shape tokens =====
 // DESIGN.md §9 — radius vocabulary: 12 / 16 / 22 / 28 / 999(pill).
 object RouteVergeShapes {
-    val small = RoundedCornerShape(12.dp)
-    val medium = RoundedCornerShape(16.dp)
-    val large = RoundedCornerShape(22.dp)
-    val extraLarge = RoundedCornerShape(28.dp)
+    val small = RoundedCornerShape(8.dp)
+    val medium = RoundedCornerShape(12.dp)
+    val large = RoundedCornerShape(16.dp)
+    val extraLarge = RoundedCornerShape(20.dp)
     val pill = RoundedCornerShape(999.dp)
 }
 
@@ -118,10 +140,10 @@ data class RouteVergePalette(
 )
 
 val RouteVergeLightPalette = RouteVergePalette(
-    primary = Color(0xFF3482FF),
+    primary = Color(0xFF0066CC),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFEAF2FF),
-    onPrimaryContainer = Color(0xFF1E5BC8),
+    primaryContainer = Color(0xFFE5F0FF),
+    onPrimaryContainer = Color(0xFF004B99),
     secondary = Color(0xFF5A6B87),
     onSecondary = Color(0xFFFFFFFF),
     secondaryContainer = Color(0xFFDCE4F0),
@@ -130,17 +152,17 @@ val RouteVergeLightPalette = RouteVergePalette(
     onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFFDAE2F0),
     onTertiaryContainer = Color(0xFF2E3A4A),
-    background = Color(0xFFF4F6FB),
-    onBackground = Color(0xFF111827),
+    background = Color(0xFFF5F5F7),
+    onBackground = Color(0xFF1D1D1F),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF111827),
+    onSurface = Color(0xFF1D1D1F),
     surfaceContainerLowest = Color(0xFFFFFFFF),
     surfaceContainerLow = Color(0xFFFDFEFF),
-    surfaceContainer = Color(0xFFF0F3F9),
-    surfaceContainerHigh = Color(0xFFF6F8FD),
-    surfaceContainerHighest = Color(0xFFE8ECF3),
-    surfaceVariant = Color(0xFFF0F3F9),
-    onSurfaceVariant = Color(0xFF667085),
+    surfaceContainer = Color(0xFFF5F5F7),
+    surfaceContainerHigh = Color(0xFFFAFAFC),
+    surfaceContainerHighest = Color(0xFFEAEAEC),
+    surfaceVariant = Color(0xFFF5F5F7),
+    onSurfaceVariant = Color(0xFF6E6E73),
     surfaceBright = Color(0xFFFDFEFF),
     surfaceDim = Color(0xFFE2E6EE),
     outline = Color(0xFFDDE3EE),
@@ -156,10 +178,10 @@ val RouteVergeLightPalette = RouteVergePalette(
 )
 
 val RouteVergeDarkPalette = RouteVergePalette(
-    primary = Color(0xFF9DC3FF),
-    onPrimary = Color(0xFF00325D),
-    primaryContainer = Color(0xFF124B86),
-    onPrimaryContainer = Color(0xFFD6E3FF),
+    primary = Color(0xFF2997FF),
+    onPrimary = Color(0xFF001B33),
+    primaryContainer = Color(0xFF123B61),
+    onPrimaryContainer = Color(0xFFD5E8FF),
     secondary = Color(0xFFADBFD8),
     onSecondary = Color(0xFF223041),
     secondaryContainer = Color(0xFF33445C),
@@ -168,28 +190,28 @@ val RouteVergeDarkPalette = RouteVergePalette(
     onTertiary = Color(0xFF273344),
     tertiaryContainer = Color(0xFF3A4A60),
     onTertiaryContainer = Color(0xFFDAE3F1),
-    background = Color(0xFF101318),
-    onBackground = Color(0xFFE1E4EA),
-    surface = Color(0xFF161A21),
-    onSurface = Color(0xFFE1E4EA),
-    surfaceContainerLowest = Color(0xFF0C0F14),
-    surfaceContainerLow = Color(0xFF1A2028),
-    surfaceContainer = Color(0xFF1F2630),
-    surfaceContainerHigh = Color(0xFF252D38),
-    surfaceContainerHighest = Color(0xFF2A3340),
-    surfaceVariant = Color(0xFF303640),
-    onSurfaceVariant = Color(0xFFC4CAD4),
-    surfaceBright = Color(0xFF252D38),
-    surfaceDim = Color(0xFF12151B),
-    outline = Color(0xFF474F5C),
-    outlineVariant = Color(0xFF383F4A),
+    background = Color(0xFF000000),
+    onBackground = Color(0xFFF5F5F7),
+    surface = Color(0xFF1C1C1E),
+    onSurface = Color(0xFFF5F5F7),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF1C1C1E),
+    surfaceContainer = Color(0xFF242426),
+    surfaceContainerHigh = Color(0xFF2C2C2E),
+    surfaceContainerHighest = Color(0xFF38383A),
+    surfaceVariant = Color(0xFF2C2C2E),
+    onSurfaceVariant = Color(0xFFAEAEB2),
+    surfaceBright = Color(0xFF38383A),
+    surfaceDim = Color(0xFF000000),
+    outline = Color(0xFF48484A),
+    outlineVariant = Color(0xFF38383A),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
     inverseSurface = Color(0xFFE4E8F0),
     inverseOnSurface = Color(0xFF1D222B),
-    inversePrimary = Color(0xFF3482FF),
+    inversePrimary = Color(0xFF0066CC),
     textDisabled = Color(0xFF6C7480)
 )
 
@@ -278,11 +300,11 @@ private val RouteVergeTypography: Typography = run {
 // RouteVergeShapes.pill is intentionally NOT mapped to any M3 role —
 // it is used explicitly only by pill-shaped components (StatusBadge, chips).
 private val RouteVergeShapesValue = Shapes(
-    extraSmall = RouteVergeShapes.small,     // 12 — small controls
-    small = RouteVergeShapes.medium,         // 16 — standard controls / fields
-    medium = RouteVergeShapes.large,         // 22 — prominent controls
-    large = RouteVergeShapes.extraLarge,     // 28 — large surfaces
-    extraLarge = RouteVergeShapes.extraLarge // 28 — large surfaces (dialogs / sheets)
+    extraSmall = RouteVergeShapes.small,
+    small = RouteVergeShapes.medium,
+    medium = RouteVergeShapes.large,
+    large = RouteVergeShapes.extraLarge,
+    extraLarge = RouteVergeShapes.extraLarge
 )
 
 // ===== ColorScheme builders (single source of truth: the palettes) =====

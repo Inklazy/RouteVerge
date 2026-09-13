@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,9 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Undo
@@ -47,7 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +60,7 @@ import com.example.campusrunner.geo.RouteMath
 import com.example.campusrunner.ui.components.RouteVergeCard
 import com.example.campusrunner.ui.components.RouteVergeCardVariant
 import com.example.campusrunner.ui.components.RouteVergeIconButton
+import com.example.campusrunner.ui.components.RouteVergeIconButtonDefaults
 import com.example.campusrunner.ui.components.RouteVergeStatus
 import com.example.campusrunner.ui.components.StatusDot
 import com.example.campusrunner.ui.formatDistance
@@ -65,6 +69,7 @@ import com.example.campusrunner.ui.map.MapController
 import com.example.campusrunner.ui.map.renderRoute
 import com.example.campusrunner.ui.theme.RouteVergeShapes
 import com.example.campusrunner.ui.theme.RouteVergeSpacing
+import com.example.campusrunner.ui.theme.RouteVergeMapTokens
 import kotlin.math.roundToInt
 
 /**
@@ -147,69 +152,83 @@ fun MapSelectionScreen(
             MapCenterCrosshair()
         }
 
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .fillMaxWidth()
-                .padding(RouteVergeSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)
+                .padding(RouteVergeSpacing.md)
         ) {
-            RouteVergeIconButton(
-                onClick = onBack,
-                contentDescription = "返回"
+            val showTopUndo = onUndo != null && points.isNotEmpty()
+            val rightButtonCount = if (showTopUndo) 3 else 2
+            val reservedWidth = RouteVergeIconButtonDefaults.TouchTarget * (rightButtonCount + 1) +
+                RouteVergeSpacing.sm * (rightButtonCount + 1)
+            val runtimeChipMaxWidth = (maxWidth - reservedWidth).coerceAtLeast(RouteVergeIconButtonDefaults.TouchTarget)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)
             ) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
-            }
-            if (runtimeEntryText != null && onRuntimeEntryClick != null) {
-                // Non-home runtime entry: replace the title slot while simulating.
-                RuntimeEntryChip(
-                    text = runtimeEntryText,
-                    status = runtimeEntryStatus,
-                    onClick = onRuntimeEntryClick,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-            } else if (showTopTitle) {
-                RouteVergeCard(
-                    variant = RouteVergeCardVariant.Elevated,
-                    modifier = Modifier.weight(1f)
+                RouteVergeIconButton(
+                    onClick = onBack,
+                    contentDescription = "返回"
                 ) {
-                    Text(
-                        text = if (points.isEmpty()) title else "$title · ${points.size} 点 · ${formatDistance(RouteMath.totalDistanceMeters(points, closeLoopPreview))}",
-                        modifier = Modifier.padding(horizontal = RouteVergeSpacing.lg, vertical = RouteVergeSpacing.md),
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
                 }
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
-                AnimatedVisibility(onUndo != null && points.isNotEmpty()) {
-                    RouteVergeIconButton(
-                        onClick = { onUndo?.invoke() },
-                        contentDescription = "撤销"
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null)
+                if (runtimeEntryText != null && onRuntimeEntryClick != null) {
+                    // Keep every map action fixed at 48dp; only the status chip yields width.
+                    Box(modifier = Modifier.weight(1f)) {
+                        RuntimeEntryChip(
+                            text = runtimeEntryText,
+                            status = runtimeEntryStatus,
+                            onClick = onRuntimeEntryClick,
+                            modifier = Modifier.widthIn(max = runtimeChipMaxWidth)
+                        )
                     }
+                } else if (showTopTitle) {
+                    RouteVergeCard(
+                        variant = RouteVergeCardVariant.Elevated,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = if (points.isEmpty()) title else "$title · ${points.size} 点 · ${formatDistance(RouteMath.totalDistanceMeters(points, closeLoopPreview))}",
+                            modifier = Modifier.padding(horizontal = RouteVergeSpacing.lg, vertical = RouteVergeSpacing.md),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
-                RouteVergeIconButton(
-                    onClick = { optionsExpanded = true },
-                    contentDescription = "地图选项"
-                ) {
-                    Icon(Icons.Rounded.Layers, contentDescription = null)
-                }
-                RouteVergeIconButton(
-                    onClick = {
-                        val current = onLocateMe()
-                        if (current != null) {
-                            mapController?.animateCamera(current, 17f)
+                Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm)) {
+                    AnimatedVisibility(showTopUndo) {
+                        RouteVergeIconButton(
+                            onClick = { onUndo?.invoke() },
+                            contentDescription = "撤销"
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null)
                         }
-                    },
-                    contentDescription = "定位到当前位置",
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Rounded.MyLocation, contentDescription = null)
+                    }
+                    RouteVergeIconButton(
+                        onClick = { optionsExpanded = true },
+                        contentDescription = "地图选项"
+                    ) {
+                        Icon(Icons.Rounded.Layers, contentDescription = null)
+                    }
+                    RouteVergeIconButton(
+                        onClick = {
+                            val current = onLocateMe()
+                            if (current != null) {
+                                mapController?.animateCamera(current, 17f)
+                            }
+                        },
+                        contentDescription = "定位到当前位置",
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        Icon(Icons.Rounded.MyLocation, contentDescription = null)
+                    }
                 }
             }
         }
@@ -257,10 +276,15 @@ private fun MapOptionsSheet(
     onSatelliteChange: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RouteVergeShapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = RouteVergeSpacing.lg)
                 .padding(bottom = RouteVergeSpacing.xxl),
             verticalArrangement = Arrangement.spacedBy(RouteVergeSpacing.xs)
@@ -362,23 +386,22 @@ private fun BoxScope.MapCenterCrosshair() {
     Box(
         modifier = Modifier
             .align(Alignment.Center)
-            .size(34.dp)
-            .padding(bottom = 2.dp),
+            .size(RouteVergeMapTokens.crosshairSize),
         contentAlignment = Alignment.Center
     ) {
         Box(
             Modifier
-                .width(28.dp)
-                .height(3.dp)
-                .shadow(2.dp, RoundedCornerShape(2.dp))
-                .background(Color.White, RoundedCornerShape(2.dp))
+                .width(RouteVergeMapTokens.crosshairArmLength)
+                .height(RouteVergeMapTokens.crosshairStrokeWidth)
+                .shadow(RouteVergeMapTokens.crosshairShadowElevation, RectangleShape, ambientColor = RouteVergeMapTokens.crosshairShadow, spotColor = RouteVergeMapTokens.crosshairShadow)
+                .background(RouteVergeMapTokens.crosshairForeground)
         )
         Box(
             Modifier
-                .width(3.dp)
-                .height(28.dp)
-                .shadow(2.dp, RoundedCornerShape(2.dp))
-                .background(Color.White, RoundedCornerShape(2.dp))
+                .width(RouteVergeMapTokens.crosshairStrokeWidth)
+                .height(RouteVergeMapTokens.crosshairArmLength)
+                .shadow(RouteVergeMapTokens.crosshairShadowElevation, RectangleShape, ambientColor = RouteVergeMapTokens.crosshairShadow, spotColor = RouteVergeMapTokens.crosshairShadow)
+                .background(RouteVergeMapTokens.crosshairForeground)
         )
     }
 }

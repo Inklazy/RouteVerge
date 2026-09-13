@@ -40,6 +40,7 @@ enum class MarkerKind { START, END, CURRENT, NORMAL, CLOSED_ORIGIN }
 
 interface MapMarkerHandle {
     fun setPosition(point: RoutePoint)
+    fun setAlpha(alpha: Float)
 }
 
 interface MapController {
@@ -188,6 +189,8 @@ private class AMapController(private val map: AMap) : MapController {
                 val next = CoordinateUtils.wgs84ToGcj02(point.latWgs84, point.lngWgs84)
                 marker?.position = AMapLatLng(next.lat, next.lng)
             }
+
+            override fun setAlpha(alpha: Float) { marker?.alpha = alpha }
         }
     }
 
@@ -267,6 +270,8 @@ private class GoogleController(private val map: GoogleMap) : MapController {
             override fun setPosition(point: RoutePoint) {
                 marker?.position = GoogleLatLng(point.latWgs84, point.lngWgs84)
             }
+
+            override fun setAlpha(alpha: Float) { marker?.alpha = alpha }
         }
     }
 
