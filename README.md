@@ -239,6 +239,11 @@ RouteVerge/
 
 ## 🔨 构建方法
 
+```bash
+git clone https://github.com/Inklazy/RouteVerge.git
+cd RouteVerge
+```
+
 在项目根目录下使用终端执行 Gradle 构建：
 
 ### 1. 执行单元测试
@@ -269,6 +274,8 @@ RouteVerge/
 ---
 
 ## 📲 安装 APK 方法
+
+> 已发布的正式版安装包可在 [GitHub Releases](https://github.com/Inklazy/RouteVerge/releases) 页面下载。
 
 1. **通过 ADB 命令行安装**：
    将手机通过数据线连接电脑并启用 USB 调试：

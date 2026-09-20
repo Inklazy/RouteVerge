@@ -20,9 +20,9 @@ data class AppUpdateResult(
 
 object AppUpdateChecker {
     private const val GITHUB_LATEST_RELEASE_API =
-        "https://api.github.com/repos/ZekTy/qunide-campus-run/releases/latest"
+        "https://api.github.com/repos/Inklazy/RouteVerge/releases/latest"
     private const val GITHUB_RELEASES_URL =
-        "https://github.com/ZekTy/qunide-campus-run/releases/latest"
+        "https://github.com/Inklazy/RouteVerge/releases/latest"
     private const val NETWORK_TIMEOUT_MS = 12000
 
     fun checkLatest(): AppUpdateResult {
