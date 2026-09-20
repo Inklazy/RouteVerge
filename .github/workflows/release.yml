@@ -229,6 +229,7 @@ jobs:
           apk="${{ steps.version.outputs.apk }}"
           cp "$source_apk" "$apk"
 
+          # ---- metadata ---------------------------------------------------------
           badging="$("$build_tools/aapt2" dump badging "$apk")"
           package_line="$(printf '%s\n' "$badging" | head -n1)"
           echo "$package_line"
@@ -243,8 +244,14 @@ jobs:
           [ "$actual_code" = "${{ steps.version.outputs.code }}" ] || { echo "::error::versionCode mismatch: $actual_code"; exit 1; }
           [ "$actual_name" = "${{ steps.version.outputs.name }}" ] || { echo "::error::versionName mismatch: $actual_name"; exit 1; }
 
-          "$build_tools/apksigner" verify --verbose --print-certs "$apk"
-          signer_dn="$("$build_tools/apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate DN: //p' | head -n1)"
+          # apksigner's certificate output differs between build-tools versions
+          # ("Signer #1 certificate DN:" vs "V2 Signer: certificate DN:"), so read
+          # the shared "certificate DN:" token instead of a fixed prefix.
+          verify_output="$("$build_tools/apksigner" verify --verbose --print-certs "$apk")"
+          printf '%s\n' "$verify_output"
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' <<< "$verify_output" \
+            || { echo "::error::APK is not signed with APK Signature Scheme v2"; exit 1; }
+          signer_dn="$(grep -m1 'certificate DN:' <<< "$verify_output" | sed 's/.*certificate DN: *//' | head -n1 || true)"
           [ -n "$signer_dn" ] || { echo "::error::APK has no signer certificate"; exit 1; }
           case "$signer_dn" in
             *"CN=Android Debug"*)
