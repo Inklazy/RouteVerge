@@ -9,3 +9,9 @@ GOOGLE_MAPS_API_KEY=replace-with-your-google-maps-key
 # You may also set activationBaseUrl and telegramBotUsername in gradle.properties.
 activationBaseUrl=https://your-worker.example.workers.dev
 telegramBotUsername=your_bot_username
+# Release signing identity. Never commit real values or the keystore itself.
+# CI (GitHub Actions) receives the same values through repository Secrets.
+RELEASE_STORE_FILE=keystore/your-release.jks
+RELEASE_STORE_PASSWORD=replace-with-your-store-password
+RELEASE_KEY_ALIAS=replace-with-your-key-alias
+RELEASE_KEY_PASSWORD=replace-with-your-key-password

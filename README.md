@@ -271,6 +271,39 @@ cd RouteVerge
 .\gradlew.bat lintDebug
 ```
 
+### 4. 正式发布（GitHub Actions 自动完成）
+
+正式版由 `.github/workflows/release.yml`（**Android Release**）在 push 到 `main` 或手动触发时自动发布：
+
+1. 运行 `testDebugUnitTest`、`lintRelease`、`assembleRelease`；
+2. 校验 APK 的 applicationId / versionName / versionCode / 正式签名 / SHA-256；
+3. 创建 `v{versionName}` Tag 与 GitHub Release，并上传 `RouteVerge-v{versionName}-release.apk`。
+
+发布前只需：
+
+- 在 `build.gradle` 中递增 `versionCode` 并修改 `versionName`（版本号的唯一来源，工作流不会自动修改版本）；
+- 在 `CHANGELOG.md` 中增加对应的 `## [x.y.z] - 日期` 小节（会被自动抽取进 Release Notes）；
+- 不要手工创建 Tag 或 Release：若 `v{versionName}` 已存在，工作流会直接失败，不会覆盖、删除或强制推送。
+
+需要在 `Settings → Secrets and variables → Actions` 配置的 Secrets：
+
+| Secret | 用途 | 必填 |
+| --- | --- | --- |
+| `RELEASE_KEYSTORE_BASE64` | 正式签名 keystore 的 Base64 内容 | 是 |
+| `RELEASE_STORE_PASSWORD` | keystore 口令 | 是 |
+| `RELEASE_KEY_ALIAS` | 签名别名 | 是 |
+| `RELEASE_KEY_PASSWORD` | 签名别名口令 | 是 |
+| `AMAP_API_KEY` | 高德地图 SDK Key | 是 |
+| `GOOGLE_MAPS_API_KEY` | Google Maps SDK Key（缺失时仅告警） | 否 |
+
+生成 keystore 的 Base64（Windows PowerShell，整段输出填入 `RELEASE_KEYSTORE_BASE64`）：
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("keystore/your-release.jks"))
+```
+
+> keystore 只在 Runner 上临时还原，构建结束后删除，不会上传为 Artifact，也不会提交到仓库。
+
 ---
 
 ## 📲 安装 APK 方法

@@ -27,6 +27,13 @@ def googleMapsApiKey = configValue("GOOGLE_MAPS_API_KEY")
 def activationBaseUrl = project.findProperty("activationBaseUrl") ?: "https://your-worker.example.workers.dev"
 def telegramBotUsername = project.findProperty("telegramBotUsername") ?: "your_bot_username"
 
+// Single source of truth for the GitHub repository used by the in-app update
+// checker. Configured in gradle.properties and injected into BuildConfig so
+// Kotlin never hard-codes the repository slug.
+def githubRepository = (
+        project.findProperty("githubRepository") ?: "Inklazy/RouteVerge"
+).toString().trim()
+
 // Release signing identity — values come from env vars or local.properties
 // (both ignored by git). No secrets are ever hard-coded in source.
 def releaseStoreFile = configValue("RELEASE_STORE_FILE")
@@ -42,8 +49,8 @@ android {
         applicationId "com.example.campusrunnernfc"
         minSdk 26
         targetSdk 35
-        versionCode 21
-        versionName "2.1.0"
+        versionCode 22
+        versionName "2.1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [
@@ -54,6 +61,7 @@ android {
         buildConfigField "String", "GOOGLE_MAPS_API_KEY", "\"${escapedBuildConfigString(googleMapsApiKey)}\""
         buildConfigField "String", "ACTIVATION_BASE_URL", "\"${escapedBuildConfigString(activationBaseUrl)}\""
         buildConfigField "String", "TELEGRAM_BOT_USERNAME", "\"${escapedBuildConfigString(telegramBotUsername)}\""
+        buildConfigField "String", "GITHUB_REPOSITORY", "\"${escapedBuildConfigString(githubRepository)}\""
     }
 
     buildFeatures {
@@ -100,6 +108,18 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+// Release automation entry point: .github/workflows/release.yml reads the
+// version metadata from here, so these files stay the only version source.
+tasks.register("printVersionInfo") {
+    group = "help"
+    description = "Prints applicationId / versionName / versionCode for release automation."
+    doLast {
+        println "APPLICATION_ID=${android.defaultConfig.applicationId}"
+        println "VERSION_NAME=${android.defaultConfig.versionName}"
+        println "VERSION_CODE=${android.defaultConfig.versionCode}"
     }
 }
 

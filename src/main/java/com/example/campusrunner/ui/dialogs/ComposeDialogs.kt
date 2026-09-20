@@ -72,7 +72,7 @@ fun UpdateCheckFailedDialog(
 fun ForceUpdateDialog(
     latestVersion: String,
     message: String,
-    onOpenRelease: () -> Unit,
+    onDownload: () -> Unit,
     onRetry: () -> Unit
 ) {
     AlertDialog(
@@ -94,9 +94,9 @@ fun ForceUpdateDialog(
         },
         confirmButton = {
             RouteVergeButton(
-                onClick = onOpenRelease,
+                onClick = onDownload,
                 variant = RouteVergeButtonVariant.Filled
-            ) { Text("前往 GitHub") }
+            ) { Text("下载 APK") }
         },
         dismissButton = {
             TextButton(onClick = onRetry) {

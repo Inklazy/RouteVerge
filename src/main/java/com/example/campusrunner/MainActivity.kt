@@ -170,7 +170,7 @@ class MainActivity : ComponentActivity() {
                             ForceUpdateDialog(
                                 latestVersion = result.latestVersion,
                                 message = result.message,
-                                onOpenRelease = { openExternalUrl(result.releaseUrl) },
+                                onDownload = { openExternalUrl(result.downloadUrl) },
                                 onRetry = ::checkForUpdates
                             )
                         }

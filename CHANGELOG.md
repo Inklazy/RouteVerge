@@ -2,6 +2,19 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/) 规范。
 
+## [2.1.1] - 2026-09-20
+
+### 更新检查重构
+- GitHub 仓库地址收敛为单一配置来源：`gradle.properties` 的 `githubRepository`，经 `BuildConfig.GITHUB_REPOSITORY` 注入，Kotlin 中不再硬编码仓库 slug。
+- 版本比较改为逐段数值比较，正确处理 `2.1.9 < 2.1.10 < 2.2.0 < 3.0.0`；当 Release 正文带 `routeverge-version-code` 标记时优先按 `versionCode` 判断。
+- 更新弹窗优先直接下载 Release 中的正式 APK 附件，没有 APK 附件时回退到 Release 页面。
+- 更新检查失败仍为不阻塞流程，可重试或继续使用当前版本。
+
+### 自动发布
+- 新增 `.github/workflows/release.yml`（Android Release）：push 到 main 或手动触发后自动执行单元测试、Lint、签名构建、APK 校验（applicationId / versionName / versionCode / 签名 / SHA-256），并创建 `v{versionName}` Tag 与 GitHub Release。
+- 若同名 Tag 或 Release 已存在，工作流直接失败，不覆盖、不删除、不强制推送。
+- 正式签名通过 GitHub Actions Secrets 注入，keystore 仅在 Runner 中临时还原，构建结束后删除且不会上传为 Artifact。
+- `build.gradle` 新增 `printVersionInfo` 任务供发布流程读取版本；版本号的唯一来源仍是 `build.gradle`。
 ## [2.1.0] - 2026-09-13
 
 ### 体验与交互优化
