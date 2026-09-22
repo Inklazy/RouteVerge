@@ -1,25 +1,15 @@
-# RouteVerge / Campus Run
+# RouteVerge
 
 > 一款基于 Android 现代架构与 Claude 暖色设计风格的高精度本地位置与路线运动模拟测试工具。
 
 ---
 
-## 📸 项目截图
+## 📱 应用截图
 
-> *此处为界面预览占位区。包含首页主控台、Claude 暖色模式切换胶囊、路线编辑器、400米跑道模板生成、前台模拟通知等核心视图。*
-
-```text
-+------------------------+  +------------------------+  +------------------------+
-|       RouteVerge       |  |       路线编辑         |  |      400米跑道模板     |
-| [定点模拟] [路线模拟]  |  | [高德地图 / 卫星底图] |  | [直道 160m | 弯道半径] |
-| 模拟状态: 运行中 (GPS) |  |   o---o---o            |  |    .--------------.    |
-| 当前配速: 5'00" /km    |  |       \   \            |  |   (   标准田径场   )   |
-| [ 暂停模拟 ] [ 停止 ]  |  |        o---o           |  |    '--------------'    |
-| [ 支付宝 NFC 一键跳转] |  | [完成绘制] [椭圆模板]  |  | [确认应用] [旋转方向]  |
-+------------------------+  +------------------------+  +------------------------+
-```
-
----
+<p align="center">
+  <img src="docs/images/home-route.png" alt="RouteVerge 主界面 / 路线模式" width="320" />
+  <img src="docs/images/route-editor.png" alt="路线地图编辑功能" width="320" />
+</p>
 
 ## 🌟 项目核心功能
 
@@ -162,6 +152,24 @@ RouteVerge 摒弃了传统工具类应用冷硬的高饱和度深蓝与生硬卡
 
 ---
 
+## 🧭 架构概览
+
+RouteVerge 使用 Jetpack Compose、Material 3、ViewModel、StateFlow、Repository 与 Android Foreground Service。主数据流为：
+
+```text
+MockLocationService / Repository
+              ↓
+       RouteVergeViewModel
+              ↓
+     StateFlow<RouteVergeUiState>
+              ↓
+        Compose AppRoot
+```
+
+Service 状态通过可观察的 StateFlow 状态桥同步到 ViewModel；UI 不再以固定间隔轮询 Service。路线持续时间基于 `SystemClock.elapsedRealtime()` 的单调时钟，持久化时只保存已累计的 active duration，因此进程或设备重启后不会依赖上一轮 boot 的 monotonic timestamp。
+
+---
+
 ## 📂 项目结构
 
 ```text
@@ -173,7 +181,7 @@ RouteVerge/
 ├── src/
 │   ├── main/
 │   │   ├── AndroidManifest.xml    # 清单文件 (权限声明、前台服务与地图 Key 配置)
-│   │   ├── java/com/example/campusrunner/
+│   │   ├── java/com/inklazy/routeverge/
 │   │   │   ├── MainActivity.kt    # 主 Activity (Edge-to-Edge 设置与根视图承载)
 │   │   │   ├── data/              # 数据层 (Point/Route 模型、Repository、设置)
 │   │   │   ├── geo/               # 地理计算核心 (坐标转换、大圆距离插值、跑道几何)
@@ -264,11 +272,15 @@ cd RouteVerge
 ./gradlew assembleDebug
 ```
 构建成功后，生成的安装包路径为：
-`build/outputs/apk/debug/CampusRunnerNfc-debug.apk`
+`build/outputs/apk/debug/RouteVerge-debug.apk`
 
 ### 3. 代码静态检查 (Lint)
 ```bash
+# Windows PowerShell
 .\gradlew.bat lintDebug
+
+# Linux / macOS
+./gradlew lintDebug
 ```
 
 ### 4. 正式发布（GitHub Actions 自动完成）
@@ -283,7 +295,7 @@ cd RouteVerge
 
 - 在 `build.gradle` 中递增 `versionCode` 并修改 `versionName`（版本号的唯一来源，工作流不会自动修改版本）；
 - 在 `CHANGELOG.md` 中增加对应的 `## [x.y.z] - 日期` 小节（会被自动抽取进 Release Notes）；
-- 不要手工创建 Tag 或 Release：若 `v{versionName}` 已存在，工作流会直接失败，不会覆盖、删除或强制推送。
+- 不要手工创建 Tag 或 Release：工作流会检查 `v{versionName}` 对应的 Tag 和 Release；若任一已存在，将明确记录并成功跳过本次发布，不会覆盖、删除或强制推送。
 
 需要在 `Settings → Secrets and variables → Actions` 配置的 Secrets：
 
@@ -313,7 +325,7 @@ cd RouteVerge
 1. **通过 ADB 命令行安装**：
    将手机通过数据线连接电脑并启用 USB 调试：
    ```bash
-   adb install -r build/outputs/apk/debug/CampusRunnerNfc-debug.apk
+   adb install -r build/outputs/apk/debug/RouteVerge-debug.apk
    ```
 2. **手机端直接安装**：
    将构建生成的 `.apk` 文件通过文件传输发送至手机，在文件管理器中点击并允许“安装未知来源应用”即可完成安装。

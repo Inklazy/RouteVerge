@@ -5,7 +5,7 @@
   so no hard-coded status/navigation bar colors live here anymore.
 -->
 <resources>
-    <style name="Theme.CampusRunner" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.RouteVerge" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
     </style>
 </resources>

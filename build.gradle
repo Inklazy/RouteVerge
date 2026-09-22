@@ -42,15 +42,15 @@ def releaseKeyAlias = configValue("RELEASE_KEY_ALIAS")
 def releaseKeyPassword = configValue("RELEASE_KEY_PASSWORD")
 
 android {
-    namespace "com.example.campusrunner"
+    namespace "com.inklazy.routeverge"
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.example.campusrunnernfc"
+        applicationId "com.inklazy.routeverge"
         minSdk 26
         targetSdk 35
-        versionCode 22
-        versionName "2.1.1"
+        versionCode 23
+        versionName "2.1.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [
@@ -136,6 +136,8 @@ dependencies {
     implementation "androidx.core:core-ktx:1.13.1"
     implementation "androidx.fragment:fragment-ktx:1.8.5"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0"
 
     implementation "com.amap.api:3dmap:10.0.600"
     implementation "com.google.android.gms:play-services-maps:18.2.0"

@@ -2,6 +2,18 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/) 规范。
 
+## [2.1.2] - 2026-09-22
+
+### 升级说明
+v2.1.2 更换了正式 Android `applicationId` 为 `com.inklazy.routeverge`。已安装旧版本的用户无法直接覆盖升级，新旧版本可能会同时存在；旧版本保存的点位、保存路线等 App 私有数据不会自动迁移。安装新版本后，请在 Android 开发者选项中重新选择 RouteVerge 作为“模拟位置信息应用”。
+
+### 工程质量与品牌统一
+- 统一 Android package / applicationId 为 `com.inklazy.routeverge`，完成 RouteVerge 品牌迁移。
+- 瘦身 `MainActivity`，引入 ViewModel、UiState 与 StateFlow，Service 状态改为响应式同步。
+- 移除 UI 对 Service 状态的约 1.2 秒轮询，路线计时改用 monotonic clock，并改进 Session Restore。
+- 增加相关单元测试，更新 README / DESIGN.md、真实应用截图及 GitHub 项目展示。
+- 优化 GitHub Actions Release：检测到已有同名 Tag 或 Release 时输出明确日志并成功跳过，不再让 Workflow 失败。
+
 ## [2.1.1] - 2026-09-20
 
 ### 更新检查重构

@@ -2,8 +2,8 @@ name: Android Release
 
 # Publishes a signed release APK whenever main moves forward.
 # versionName / versionCode are read from build.gradle — this workflow never
-# edits or commits version numbers, and never overwrites an existing tag,
-# release or asset.
+# edits or commits version numbers. Existing tags/releases are detected early
+# and skipped successfully; new releases retain all validation and signing checks.
 on:
   push:
     branches:
@@ -47,32 +47,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Verify required secrets
-        run: |
-          set -euo pipefail
-          missing=0
-          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD AMAP_API_KEY; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing repository secret: $name"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "Add the secrets under Settings -> Secrets and variables -> Actions, then re-run this workflow."
-            exit 1
-          fi
-          if [ -z "${GOOGLE_MAPS_API_KEY}" ]; then
-            echo "::warning::GOOGLE_MAPS_API_KEY is not set - the Google Maps provider will have no key in this build."
-          fi
-
-      - name: Restore release keystore
-        run: |
-          set -euo pipefail
-          mkdir -p keystore
-          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_STORE_FILE"
-          chmod 600 "$RELEASE_STORE_FILE"
-          test -s "$RELEASE_STORE_FILE" || { echo "::error::Keystore restore failed"; exit 1; }
-
       - name: Read version from Gradle
         id: version
         run: |
@@ -92,7 +66,92 @@ jobs:
             echo "apk=RouteVerge-v$version_name-release.apk"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Check version and existing tag/release
+        id: check_version
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          tag_exists=false
+          release_exists=false
+
+          # A tag may exist without a Release, so check both independently.
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1
+          tag_status=$?
+          set -e
+          case "$tag_status" in
+            0)
+              tag_exists=true
+              ;;
+            2)
+              ;;
+            *)
+              echo "::error::Unable to determine whether tag $tag exists (git ls-remote status $tag_status)."
+              exit 1
+              ;;
+          esac
+
+          release_error="$(mktemp)"
+          set +e
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >/dev/null 2>"$release_error"
+          release_status=$?
+          set -e
+          if [ "$release_status" -eq 0 ]; then
+            release_exists=true
+          elif grep -q 'HTTP 404' "$release_error"; then
+            :
+          else
+            echo "::error::Unable to determine whether release $tag exists."
+            cat "$release_error"
+            rm -f "$release_error"
+            exit 1
+          fi
+          rm -f "$release_error"
+
+          if [ "$tag_exists" = true ] || [ "$release_exists" = true ]; then
+            echo "release_exists=true" >> "$GITHUB_OUTPUT"
+            if [ "$tag_exists" = true ] && [ "$release_exists" = true ]; then
+              echo "Release $tag already exists (tag and GitHub Release found), skipping release."
+            elif [ "$tag_exists" = true ]; then
+              echo "Tag $tag already exists, skipping release."
+            else
+              echo "Release $tag already exists, skipping release."
+            fi
+          else
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Release $tag does not exist yet; continuing with the formal release checks."
+          fi
+
+      - name: Verify required secrets
+        if: steps.check_version.outputs.release_exists != 'true'
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD AMAP_API_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add the secrets under Settings -> Secrets and variables -> Actions, then re-run this workflow."
+            exit 1
+          fi
+          if [ -z "${GOOGLE_MAPS_API_KEY}" ]; then
+            echo "::warning::GOOGLE_MAPS_API_KEY is not set - the Google Maps provider will have no key in this build."
+          fi
+
+      - name: Restore release keystore
+        if: steps.check_version.outputs.release_exists != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p keystore
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_STORE_FILE"
+          chmod 600 "$RELEASE_STORE_FILE"
+          test -s "$RELEASE_STORE_FILE" || { echo "::error::Keystore restore failed"; exit 1; }
+
       - name: Verify versionCode is greater than the previous release
+        if: steps.check_version.outputs.release_exists != 'true'
         run: |
           set -euo pipefail
           current_code="${{ steps.version.outputs.code }}"
@@ -171,55 +230,30 @@ jobs:
             exit 1
           fi
           echo "versionCode check passed: $current_code > ${previous_code:-<none>} (versionName $current_name)"
-      - name: Release guard (branch, tag, release)
+      - name: Verify release branch
+        if: steps.check_version.outputs.release_exists != 'true'
         run: |
           set -euo pipefail
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::Releases are only published from main (got $GITHUB_REF)."
             exit 1
           fi
-          tag="${{ steps.version.outputs.tag }}"
-
-          # `git ls-remote --exit-code` returns 2 when no ref matches, so a
-          # non-zero status alone cannot distinguish "absent" from "network error".
-          set +e
-          ls_output="$(git ls-remote --exit-code --tags origin "refs/tags/$tag" 2>&1)"
-          ls_status=$?
-          set -e
-          case "$ls_status" in
-            0)
-              echo "::error::Tag $tag already exists on origin. Bump versionName and versionCode in build.gradle before releasing."
-              exit 1
-              ;;
-            2)
-              echo "Tag $tag does not exist yet (expected)."
-              ;;
-            *)
-              echo "::error::Cannot verify remote tags: $ls_output"
-              exit 1
-              ;;
-          esac
-
-          set +e
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
-          release_status=$?
-          set -e
-          if [ "$release_status" -eq 0 ]; then
-            echo "::error::Release $tag already exists; this workflow never overwrites an existing release."
-            exit 1
-          fi
-          echo "Release guard passed for $tag."
+          echo "Release branch guard passed for ${{ steps.version.outputs.tag }}."
 
       - name: Run unit tests
+        if: steps.check_version.outputs.release_exists != 'true'
         run: ./gradlew testDebugUnitTest --console=plain
 
       - name: Run lint (release)
+        if: steps.check_version.outputs.release_exists != 'true'
         run: ./gradlew lintRelease --console=plain
 
       - name: Assemble release APK
+        if: steps.check_version.outputs.release_exists != 'true'
         run: ./gradlew assembleRelease --console=plain
 
       - name: Verify APK metadata and signature
+        if: steps.check_version.outputs.release_exists != 'true'
         id: apk
         run: |
           set -euo pipefail
@@ -271,6 +305,7 @@ jobs:
           echo "Size: $size bytes"
 
       - name: Compose release notes
+        if: steps.check_version.outputs.release_exists != 'true'
         run: |
           set -euo pipefail
           version="${{ steps.version.outputs.name }}"
@@ -326,6 +361,7 @@ jobs:
           cat "$notes"
 
       - name: Create and push release tag
+        if: steps.check_version.outputs.release_exists != 'true'
         run: |
           set -euo pipefail
           tag="${{ steps.version.outputs.tag }}"
@@ -335,6 +371,7 @@ jobs:
           git push origin "refs/tags/$tag"
 
       - name: Create GitHub Release and upload APK
+        if: steps.check_version.outputs.release_exists != 'true'
         run: |
           set -euo pipefail
           gh release create "${{ steps.version.outputs.tag }}" "${{ steps.version.outputs.apk }}" \
@@ -345,6 +382,7 @@ jobs:
             --latest
 
       - name: Verify published release asset
+        if: steps.check_version.outputs.release_exists != 'true'
         run: |
           set -euo pipefail
           tag="${{ steps.version.outputs.tag }}"
