@@ -14,8 +14,9 @@ data class MockLocationState(
 
 /**
  * Process-local state bridge. It contains no Activity or Service reference, so
- * collectors can come and go safely across configuration changes. Persistence
- * remains the source of truth when the process is recreated.
+ * collectors can come and go safely across configuration changes. The live
+ * service runtime is the only source of truth for running/paused flags;
+ * persistence is used only for session details and stale-session cleanup.
  */
 object MockLocationStateStore {
     private val _state = MutableStateFlow(MockLocationState())
@@ -25,12 +26,32 @@ object MockLocationStateStore {
         _state.value = MockLocationState(isRunning, isPaused, session)
     }
 
-    fun syncFromPersistence(context: Context) {
-        val snapshot = MockLocationService.readSession(context)
-        _state.value = MockLocationState(
-            isRunning = snapshot != null || MockLocationService.isRunning,
-            isPaused = MockLocationService.isPaused || snapshot?.isPaused == true,
-            session = snapshot
+    fun syncFromRuntime(context: Context) {
+        if (!MockLocationService.isRunning) {
+            // This is the cold-start/process-death boundary: a persisted
+            // session without a live service is stale and must not affect UI.
+            MockLocationService.clearSessionPersistence(context)
+            _state.value = MockLocationState()
+            return
+        }
+
+        _state.value = runtimeState(
+            serviceRunning = true,
+            servicePaused = MockLocationService.isPaused,
+            session = MockLocationService.currentSession()
+        )
+    }
+
+    internal fun runtimeState(
+        serviceRunning: Boolean,
+        servicePaused: Boolean,
+        session: MockSessionSnapshot?
+    ): MockLocationState {
+        if (!serviceRunning) return MockLocationState()
+        return MockLocationState(
+            isRunning = true,
+            isPaused = servicePaused,
+            session = session
         )
     }
 }

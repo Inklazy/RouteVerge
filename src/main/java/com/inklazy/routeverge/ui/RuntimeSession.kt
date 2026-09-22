@@ -12,10 +12,11 @@ enum class RuntimeSessionKind { POINT, ROUTE }
  * route name, configured speed, mode, loop count, known total distance).
  *
  * It is NOT authoritative runtime state: whether the UI shows running/paused
- * always comes from the service chain (MockLocationService ->
- * MainActivity.refreshState() -> isRunning / isPaused). This session object is
- * created when a simulation starts, kept across pause/resume, and reconstructed
- * from the foreground service's persisted session when the activity returns.
+ * always comes from the live service chain (MockLocationService ->
+ * MockLocationStateStore -> UI). This session object is created when a
+ * simulation starts, kept across pause/resume and Activity recreation, and is
+ * cleared when the service runtime ends. Persisted data is not a signal that a
+ * simulation is still running.
  */
 data class RuntimeSession(
     val kind: RuntimeSessionKind,

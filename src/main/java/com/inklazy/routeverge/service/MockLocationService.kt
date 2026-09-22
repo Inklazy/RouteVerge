@@ -38,8 +38,9 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 
-/** Persisted description/progress used to restore a foreground simulation. */
+/** Persisted description/progress for the current simulation. It is not a restart signal. */
 data class MockSessionSnapshot(
     val kind: String,
     val pointLat: Double? = null,
@@ -56,6 +57,8 @@ data class MockSessionSnapshot(
 
 class MockLocationService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val sessionLock = Any()
+    private val sessionGeneration = AtomicLong(0L)
     private lateinit var locationManager: LocationManager
     private var job: Job? = null
     private var activeProviders: List<String> = emptyList()
@@ -69,23 +72,25 @@ class MockLocationService : Service() {
         super.onCreate()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         createNotificationChannel()
+        // A newly created service has no runtime session. Never infer one from
+        // the persisted session store here.
+        isRunning = false
+        isPaused = false
+        runtimeSession = null
+        MockLocationStateStore.publish(false, false, null)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // START_REDELIVER_INTENT may arrive after the process was reclaimed.
-        // Restore the persisted clock/progress instead of starting at zero.
-        if (intent == null) {
-            return if (restorePersistedSession()) START_STICKY else START_NOT_STICKY
-        }
-        val restoreExisting = (flags and START_FLAG_REDELIVERY) != 0
-        return when (intent.action) {
+    override fun onStartCommand(intent: Intent?, _flags: Int, startId: Int): Int {
+        // This service is deliberately non-sticky. If Android kills the
+        // process, the old intent must not be replayed and no persisted
+        // session may be used to start mocking again.
+        return when (intent?.action) {
             ACTION_START_POINT -> {
                 startPoint(
-                lat = intent.getDoubleExtra(EXTRA_LAT, 0.0),
-                lng = intent.getDoubleExtra(EXTRA_LNG, 0.0),
-                restoreExisting = restoreExisting
+                    lat = intent.getDoubleExtra(EXTRA_LAT, 0.0),
+                    lng = intent.getDoubleExtra(EXTRA_LNG, 0.0)
                 )
-                START_REDELIVER_INTENT
+                START_NOT_STICKY
             }
 
             ACTION_START_ROUTE -> {
@@ -93,20 +98,19 @@ class MockLocationService : Service() {
                     routeJson = intent.getStringExtra(EXTRA_ROUTE_JSON).orEmpty(),
                     speedMps = intent.getDoubleExtra(EXTRA_SPEED_MPS, 0.0),
                     closeLoop = intent.getBooleanExtra(EXTRA_CLOSE_LOOP, false),
-                    loopCount = intent.getIntExtra(EXTRA_LOOP_COUNT, 1).coerceAtLeast(1),
-                    restoreExisting = restoreExisting
+                    loopCount = intent.getIntExtra(EXTRA_LOOP_COUNT, 1).coerceAtLeast(1)
                 )
-                START_REDELIVER_INTENT
+                START_NOT_STICKY
             }
 
             ACTION_PAUSE -> {
-                pauseMocking()
-                START_STICKY
+                if (isRunning) pauseMocking() else stopSelfResult(startId)
+                START_NOT_STICKY
             }
 
             ACTION_RESUME -> {
-                resumeMocking()
-                START_STICKY
+                if (isRunning) resumeMocking() else stopSelfResult(startId)
+                START_NOT_STICKY
             }
 
             ACTION_STOP -> {
@@ -114,11 +118,20 @@ class MockLocationService : Service() {
                 START_NOT_STICKY
             }
 
-            else -> if (isRunning || restorePersistedSession()) START_STICKY else START_NOT_STICKY
+            else -> {
+                // A null/unknown command is not a recovery request. Do not
+                // leave an inert started service behind.
+                stopSelfResult(startId)
+                START_NOT_STICKY
+            }
         }
     }
 
     override fun onDestroy() {
+        // stopWithTask=true stops this service when its task is removed, and
+        // normal service teardown reaches this single cleanup path. Process
+        // death can skip callbacks; the next cold start clears stale
+        // persistence because it does not observe a live runtime.
         stopMocking(stopService = false)
         scope.cancel()
         super.onDestroy()
@@ -126,13 +139,10 @@ class MockLocationService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun startPoint(lat: Double, lng: Double, restoreExisting: Boolean = false) {
-        if (!restoreExisting || readSession(this) == null) {
-            writePointSession(lat, lng)
-        }
+    private fun startPoint(lat: Double, lng: Double) {
+        writePointSession(lat, lng)
         startMockLoop(
             notificationText = "定点模拟中：${formatCoord(lat)}, ${formatCoord(lng)}",
-            restoreExisting = restoreExisting,
             locationProvider = {
                 SimulatedLocation(
                     latWgs84 = lat,
@@ -146,10 +156,10 @@ class MockLocationService : Service() {
         )
     }
 
-    private fun startRoute(routeJson: String, speedMps: Double, closeLoop: Boolean, loopCount: Int, restoreExisting: Boolean = false) {
-        val route = decodeRoute(routeJson) ?: return
-        if (speedMps <= 0.0) {
-            stopSelf()
+    private fun startRoute(routeJson: String, speedMps: Double, closeLoop: Boolean, loopCount: Int) {
+        val route = decodeRoute(routeJson)
+        if (route == null || speedMps <= 0.0) {
+            stopMocking()
             return
         }
         val playbackMode = if (closeLoop) PlaybackMode.LOOP else PlaybackMode.OUT_AND_BACK
@@ -160,12 +170,9 @@ class MockLocationService : Service() {
             Long.MAX_VALUE
         }
 
-        if (!restoreExisting || readSession(this) == null) {
-            writeRouteSession(route, routeJson, speedMps, closeLoop, loopCount)
-        }
+        writeRouteSession(route, routeJson, speedMps, closeLoop, loopCount)
         startMockLoop(
             notificationText = "路线模拟中：${route.name} $speedMps m/s",
-            restoreExisting = restoreExisting,
             locationProvider = {
                 val elapsedMillis = activeElapsedMillis()
                 if (elapsedMillis >= maxElapsedMillis) {
@@ -181,61 +188,80 @@ class MockLocationService : Service() {
         )
     }
 
-    private fun startMockLoop(notificationText: String, restoreExisting: Boolean = false, locationProvider: () -> SimulatedLocation) {
+    private fun startMockLoop(notificationText: String, locationProvider: () -> SimulatedLocation) {
         if (!hasFineLocationPermission()) {
-            clearPersistedSession()
-            stopSelf()
+            stopMocking()
             return
         }
 
+        val generation = sessionGeneration.incrementAndGet()
         job?.cancel()
         job = null
         removeActiveProviders()
 
         val readyProviders = PROVIDERS.filter { setupProvider(it) }
         if (readyProviders.isEmpty()) {
-            isRunning = false
-            isPaused = false
-            MockLocationStateStore.publish(false, false, null)
-            clearPersistedSession()
-            removeActiveProviders()
-            stopSelf()
+            stopMocking()
             return
         }
         activeProviders = readyProviders
 
+        val session = readSession(this)
+        if (session == null) {
+            stopMocking()
+            return
+        }
+
         acquireWakeLock()
-        val persisted = if (restoreExisting) readSession(this) else null
-        simulationClock.start(
-            restoredActiveElapsedMillis = persisted?.activeElapsedMillis ?: 0L,
-            restoredPaused = persisted?.isPaused == true
-        )
-        lastPushedLocation = locationProvider()
-        consecutivePushFailures = 0
-        isRunning = true
-        isPaused = persisted?.isPaused == true
-        MockLocationStateStore.publish(true, isPaused, readSession(this))
+        val activated = synchronized(sessionLock) {
+            if (generation != sessionGeneration.get()) {
+                false
+            } else {
+                simulationClock.start()
+                lastPushedLocation = locationProvider()
+                consecutivePushFailures = 0
+                runtimeSession = session
+                isRunning = true
+                isPaused = false
+                MockLocationStateStore.publish(true, false, session)
+                true
+            }
+        }
+        if (!activated) {
+            readyProviders.forEach(::removeProvider)
+            releaseWakeLock()
+            return
+        }
+
         this.notificationText = notificationText
         startForeground(
             NOTIFICATION_ID,
-            buildNotification(if (isPaused) "模拟已暂停" else notificationText)
+            buildNotification(notificationText)
         )
+        if (!isSessionActive(generation)) {
+            readyProviders.forEach(::removeProvider)
+            releaseWakeLock()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+            return
+        }
         activeProviders.forEach { provider ->
             pushLocation(provider, lastPushedLocation ?: locationProvider())
         }
 
         job = scope.launch {
-            while (isActive) {
+            while (isActive && isSessionActive(generation)) {
                 val loc = if (isPaused) {
                     lastPushedLocation ?: locationProvider()
                 } else {
                     locationProvider().also { lastPushedLocation = it }
                 }
+                if (!isSessionActive(generation)) return@launch
                 val pushed = activeProviders.count { provider -> pushLocation(provider, loc) }
                 if (pushed == 0) {
                     consecutivePushFailures += 1
                     Log.w(TAG, "No mock providers accepted location; attempting recovery #$consecutivePushFailures")
-                    recoverProviders()
+                    recoverProviders(generation)
                     if (consecutivePushFailures >= MAX_PROVIDER_RECOVERY_ATTEMPTS) {
                         Log.w(TAG, "Mock provider recovery failed too many times; stopping mock loop")
                         stopMocking()
@@ -245,26 +271,29 @@ class MockLocationService : Service() {
                     consecutivePushFailures = 0
                     LocationCache.save(this@MockLocationService, RoutePoint(loc.latWgs84, loc.lngWgs84))
                 }
-                persistProgress()
+                persistProgress(generation)
                 delay(1000L)
             }
         }
     }
 
+    private fun isSessionActive(generation: Long): Boolean =
+        isRunning && generation == sessionGeneration.get()
+
     private fun writePointSession(lat: Double, lng: Double) {
         sessionPreferences().edit().clear()
-            .putBoolean(KEY_ACTIVE, true)
+            .putBoolean(KEY_SESSION_PRESENT, true)
             .putString(KEY_KIND, KIND_POINT)
             .putString(KEY_POINT_LAT, lat.toString())
             .putString(KEY_POINT_LNG, lng.toString())
-            .putLong(KEY_ACTIVE_ELAPSED, 0L)
+            .putLong(KEY_ELAPSED_MILLIS, 0L)
             .putBoolean(KEY_PAUSED, false)
             .apply()
     }
 
     private fun writeRouteSession(route: SavedRoute, routeJson: String, speedMps: Double, closeLoop: Boolean, loopCount: Int) {
         sessionPreferences().edit().clear()
-            .putBoolean(KEY_ACTIVE, true)
+            .putBoolean(KEY_SESSION_PRESENT, true)
             .putString(KEY_KIND, KIND_ROUTE)
             .putString(KEY_ROUTE_ID, route.id)
             .putString(KEY_ROUTE_NAME, route.name)
@@ -272,53 +301,34 @@ class MockLocationService : Service() {
             .putString(KEY_SPEED_MPS, speedMps.toString())
             .putBoolean(KEY_CLOSE_LOOP, closeLoop)
             .putInt(KEY_LOOP_COUNT, loopCount.coerceAtLeast(1))
-            .putLong(KEY_ACTIVE_ELAPSED, 0L)
+            .putLong(KEY_ELAPSED_MILLIS, 0L)
             .putBoolean(KEY_PAUSED, false)
             .apply()
     }
 
-    private fun persistProgress() {
-        if (!isRunning) return
-        sessionPreferences().edit()
-            .putBoolean(KEY_ACTIVE, true)
-            .putLong(KEY_ACTIVE_ELAPSED, activeElapsedMillis().coerceAtLeast(0L))
-            .putBoolean(KEY_PAUSED, isPaused)
-            .apply()
-        MockLocationStateStore.publish(true, isPaused, readSession(this))
+    private fun persistProgress(generation: Long) {
+        synchronized(sessionLock) {
+            if (!isSessionActive(generation)) return
+            val session = runtimeSession ?: return
+            val updatedSession = session.copy(
+                activeElapsedMillis = activeElapsedMillis().coerceAtLeast(0L),
+                isPaused = isPaused
+            )
+            runtimeSession = updatedSession
+            sessionPreferences().edit()
+                .putBoolean(KEY_SESSION_PRESENT, true)
+                .putLong(KEY_ELAPSED_MILLIS, updatedSession.activeElapsedMillis)
+                .putBoolean(KEY_PAUSED, updatedSession.isPaused)
+                .apply()
+            MockLocationStateStore.publish(true, isPaused, updatedSession)
+        }
     }
 
     private fun clearPersistedSession() {
-        sessionPreferences().edit().clear().apply()
+        clearSessionPersistence(this)
     }
 
     private fun sessionPreferences() = getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE)
-
-    private fun restorePersistedSession(): Boolean {
-        val snapshot = readSession(this) ?: return false
-        val restored = when (snapshot.kind) {
-            KIND_POINT -> {
-                val lat = snapshot.pointLat
-                val lng = snapshot.pointLng
-                if (lat == null || lng == null) false else {
-                    startPoint(lat, lng, restoreExisting = true)
-                    true
-                }
-            }
-
-            KIND_ROUTE -> {
-                val json = snapshot.routeJson
-                val speed = snapshot.speedMps
-                if (json.isNullOrBlank() || speed == null) false else {
-                    startRoute(json, speed, snapshot.closeLoop, snapshot.loopCount, restoreExisting = true)
-                    true
-                }
-            }
-
-            else -> false
-        }
-        if (!restored) clearPersistedSession()
-        return restored
-    }
 
     private fun refreshNotification(text: String) {
         if (!isRunning) return
@@ -326,33 +336,54 @@ class MockLocationService : Service() {
     }
 
     private fun pauseMocking() {
-        if (!isRunning || isPaused) return
-        simulationClock.pause()
-        isPaused = true
-        persistProgress()
-        refreshNotification("模拟已暂停")
+        val changed = synchronized(sessionLock) {
+            if (!isRunning || isPaused) {
+                false
+            } else {
+                simulationClock.pause()
+                isPaused = true
+                persistProgress(sessionGeneration.get())
+                true
+            }
+        }
+        if (changed) refreshNotification("模拟已暂停")
     }
 
     private fun resumeMocking() {
-        if (!isRunning || !isPaused) return
-        simulationClock.resume()
-        isPaused = false
-        persistProgress()
-        refreshNotification(notificationText)
+        val changed = synchronized(sessionLock) {
+            if (!isRunning || !isPaused) {
+                false
+            } else {
+                simulationClock.resume()
+                isPaused = false
+                persistProgress(sessionGeneration.get())
+                true
+            }
+        }
+        if (changed) refreshNotification(notificationText)
     }
 
     private fun stopMocking(stopService: Boolean = true) {
-        job?.cancel()
-        job = null
-        isRunning = false
-        isPaused = false
-        lastPushedLocation = null
-        consecutivePushFailures = 0
-        clearPersistedSession()
-        MockLocationStateStore.publish(false, false, null)
+        val jobToCancel = synchronized(sessionLock) {
+            // Invalidate the loop before clearing persistence so a currently
+            // finishing iteration cannot write active=true back afterwards.
+            sessionGeneration.incrementAndGet()
+            val currentJob = job
+            job = null
+            isRunning = false
+            isPaused = false
+            runtimeSession = null
+            lastPushedLocation = null
+            consecutivePushFailures = 0
+            clearPersistedSession()
+            MockLocationStateStore.publish(false, false, null)
+            currentJob
+        }
+        jobToCancel?.cancel()
         removeActiveProviders()
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
+        getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
         if (stopService) {
             stopSelf()
         }
@@ -386,10 +417,19 @@ class MockLocationService : Service() {
         runCatching { locationManager.removeTestProvider(provider) }
     }
 
-    private fun recoverProviders() {
-        val restoredProviders = PROVIDERS.filter { setupProvider(it) }
-        if (restoredProviders.isNotEmpty()) {
-            activeProviders = restoredProviders
+    private fun recoverProviders(generation: Long) {
+        if (!isSessionActive(generation)) return
+        val recoveredProviders = PROVIDERS.filter { isSessionActive(generation) && setupProvider(it) }
+        if (recoveredProviders.isEmpty()) return
+
+        synchronized(sessionLock) {
+            if (!isSessionActive(generation)) {
+                // A stop can race provider setup. Remove anything this stale
+                // recovery attempt managed to register after the main cleanup.
+                recoveredProviders.forEach(::removeProvider)
+                return
+            }
+            activeProviders = recoveredProviders
             lastPushedLocation?.let { location ->
                 activeProviders.forEach { provider -> pushLocation(provider, location) }
             }
@@ -509,7 +549,7 @@ class MockLocationService : Service() {
         private const val TAG = "MockLocationService"
         private const val MAX_PROVIDER_RECOVERY_ATTEMPTS = 5
         private const val SESSION_PREFS = "mock_location_session"
-        private const val KEY_ACTIVE = "active"
+        private const val KEY_SESSION_PRESENT = "session_present"
         private const val KEY_KIND = "kind"
         private const val KEY_POINT_LAT = "point_lat"
         private const val KEY_POINT_LNG = "point_lng"
@@ -519,7 +559,7 @@ class MockLocationService : Service() {
         private const val KEY_SPEED_MPS = "speed_mps"
         private const val KEY_CLOSE_LOOP = "close_loop"
         private const val KEY_LOOP_COUNT = "loop_count"
-        private const val KEY_ACTIVE_ELAPSED = "active_elapsed_ms"
+        private const val KEY_ELAPSED_MILLIS = "active_elapsed_ms"
         private const val KEY_PAUSED = "paused"
         private const val KIND_POINT = "point"
         private const val KIND_ROUTE = "route"
@@ -533,9 +573,21 @@ class MockLocationService : Service() {
         var isPaused: Boolean = false
             private set
 
+        @Volatile
+        private var runtimeSession: MockSessionSnapshot? = null
+
+        fun currentSession(): MockSessionSnapshot? = runtimeSession.takeIf { isRunning }
+
+        fun clearSessionPersistence(context: Context) {
+            context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply()
+        }
+
         fun readSession(context: Context): MockSessionSnapshot? {
             val prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE)
-            if (!prefs.getBoolean(KEY_ACTIVE, false)) return null
+            if (!prefs.getBoolean(KEY_SESSION_PRESENT, false)) return null
             val kind = prefs.getString(KEY_KIND, null) ?: return null
             return MockSessionSnapshot(
                 kind = kind,
@@ -547,7 +599,7 @@ class MockLocationService : Service() {
                 speedMps = prefs.getString(KEY_SPEED_MPS, null)?.toDoubleOrNull(),
                 closeLoop = prefs.getBoolean(KEY_CLOSE_LOOP, false),
                 loopCount = prefs.getInt(KEY_LOOP_COUNT, 1).coerceAtLeast(1),
-                activeElapsedMillis = prefs.getLong(KEY_ACTIVE_ELAPSED, 0L).coerceAtLeast(0L),
+                activeElapsedMillis = prefs.getLong(KEY_ELAPSED_MILLIS, 0L).coerceAtLeast(0L),
                 isPaused = prefs.getBoolean(KEY_PAUSED, false)
             )
         }

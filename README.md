@@ -166,7 +166,7 @@ MockLocationService / Repository
         Compose AppRoot
 ```
 
-Service 状态通过可观察的 StateFlow 状态桥同步到 ViewModel；UI 不再以固定间隔轮询 Service。路线持续时间基于 `SystemClock.elapsedRealtime()` 的单调时钟，持久化时只保存已累计的 active duration，因此进程或设备重启后不会依赖上一轮 boot 的 monotonic timestamp。
+Service 状态通过可观察的 StateFlow 状态桥同步到 ViewModel；UI 不再以固定间隔轮询 Service。路线持续时间基于 `SystemClock.elapsedRealtime()` 的单调时钟，持久化时只保存当前运行会话所需的 active duration 与配置；持久化数据不会触发 Service 自动恢复，进程被杀或从最近任务划掉后，下一次冷启动会清理陈旧会话并回到待命状态。
 
 ---
 

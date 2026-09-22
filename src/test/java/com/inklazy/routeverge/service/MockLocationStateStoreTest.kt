@@ -1,10 +1,26 @@
 package com.inklazy.routeverge.service
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MockLocationStateStoreTest {
+    @Test
+    fun persistedSessionCannotMarkADeadServiceAsRunning() {
+        val staleSession = MockSessionSnapshot(kind = "route", isPaused = true)
+
+        val state = MockLocationStateStore.runtimeState(
+            serviceRunning = false,
+            servicePaused = true,
+            session = staleSession
+        )
+
+        assertFalse(state.isRunning)
+        assertFalse(state.isPaused)
+        assertNull(state.session)
+    }
+
     @Test
     fun serviceTransitionsAreRepresentedAsObservableState() {
         val session = MockSessionSnapshot(kind = "route", activeElapsedMillis = 250L)

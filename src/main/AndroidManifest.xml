@@ -55,7 +55,7 @@
             android:name=".service.MockLocationService"
             android:enabled="true"
             android:exported="false"
-            android:stopWithTask="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="location" />
     </application>
 </manifest>

@@ -51,20 +51,20 @@ class ActiveSimulationClockTest {
     }
 
     @Test
-    fun restoreUsesPersistedActiveDurationNotWallClockOrigin() {
+    fun initialDurationIsIndependentOfWallClockOrigin() {
         val clock = FakeClock(50_000L)
         val sessionClock = ActiveSimulationClock(clock)
-        sessionClock.start(restoredActiveElapsedMillis = 12_000L, restoredPaused = false)
+        sessionClock.start(initialActiveElapsedMillis = 12_000L, initiallyPaused = false)
         clock.now = 52_500L
 
         assertEquals(14_500L, sessionClock.activeElapsedMillis())
     }
 
     @Test
-    fun restorePausedSessionRemainsPausedUntilResume() {
+    fun initiallyPausedSessionRemainsPausedUntilResume() {
         val clock = FakeClock(50_000L)
         val sessionClock = ActiveSimulationClock(clock)
-        sessionClock.start(restoredActiveElapsedMillis = 12_000L, restoredPaused = true)
+        sessionClock.start(initialActiveElapsedMillis = 12_000L, initiallyPaused = true)
         clock.now = 55_000L
         assertEquals(12_000L, sessionClock.activeElapsedMillis())
 

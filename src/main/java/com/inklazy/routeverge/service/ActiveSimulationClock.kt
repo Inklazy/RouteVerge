@@ -10,9 +10,10 @@ object SystemMonotonicClock : MonotonicClock {
 }
 
 /**
- * Tracks active duration independently of wall-clock changes. Persist only
- * [activeElapsedMillis]; timestamps are reconstructed after process/device
- * restart from the current monotonic clock reading.
+ * Tracks active duration independently of wall-clock changes. The service
+ * persists progress for live-session UI details, but each new service runtime
+ * starts a fresh clock; the optional initial values are only for clock
+ * construction/testing.
  */
 class ActiveSimulationClock(
     private val clock: MonotonicClock = SystemMonotonicClock
@@ -22,12 +23,12 @@ class ActiveSimulationClock(
     private var accumulatedPausedMillis = 0L
     private var paused = false
 
-    fun start(restoredActiveElapsedMillis: Long = 0L, restoredPaused: Boolean = false) {
+    fun start(initialActiveElapsedMillis: Long = 0L, initiallyPaused: Boolean = false) {
         val now = clock.elapsedRealtimeMillis()
-        startedAtMillis = now - restoredActiveElapsedMillis.coerceAtLeast(0L)
-        pausedAtMillis = if (restoredPaused) now else 0L
+        startedAtMillis = now - initialActiveElapsedMillis.coerceAtLeast(0L)
+        pausedAtMillis = if (initiallyPaused) now else 0L
         accumulatedPausedMillis = 0L
-        paused = restoredPaused
+        paused = initiallyPaused
     }
 
     fun pause() {

@@ -69,7 +69,7 @@ class RouteVergeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun refresh() {
-        MockLocationStateStore.syncFromPersistence(appContext)
+        MockLocationStateStore.syncFromRuntime(appContext)
         _uiState.update {
             it.copy(
                 hasLocationPermission = hasFineLocationPermission(),
@@ -90,7 +90,7 @@ class RouteVergeViewModel(application: Application) : AndroidViewModel(applicati
                 canMockLocation = hasFineLocationPermission() && MockPermissionFacade.canUse(appContext)
             )
         }
-        MockLocationStateStore.syncFromPersistence(appContext)
+        MockLocationStateStore.syncFromRuntime(appContext)
     }
 
     fun setMapProvider(provider: MapProvider) {
