@@ -1,6 +1,8 @@
 package com.inklazy.routeverge.ui.screens.home
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,9 +20,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
+import com.inklazy.routeverge.ui.components.RouteVergePressFeedback
 import com.inklazy.routeverge.ui.components.RouteVergeStatus
 import com.inklazy.routeverge.ui.components.StatusDot
 import com.inklazy.routeverge.ui.theme.RouteVergeShapes
@@ -39,6 +46,8 @@ fun NfcToolsRow(
     onOpenAlipay: () -> Unit,
     onVerify: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Column(
         // This is deliberately the canvas token, not a card. It remains opaque
         // so scrolled records can never show through the fixed bottom bar.
@@ -54,7 +63,12 @@ fun NfcToolsRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RouteVergeShapes.medium)
-                    .clickable { if (isActivated) onOpenAlipay() else onVerify() }
+                    .background(RouteVergePressFeedback.color(Color.Transparent, MaterialTheme.colorScheme.onSurface, pressed))
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        role = Role.Button
+                    ) { if (isActivated) onOpenAlipay() else onVerify() }
                     .padding(vertical = RouteVergeSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically
             ) {

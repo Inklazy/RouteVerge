@@ -1,6 +1,8 @@
 package com.inklazy.routeverge.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -8,9 +10,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -69,11 +74,29 @@ fun RouteVergeIconButton(
     }.let { contentColor ?: it }
 
     val isSelected = enabled && variant == RouteVergeIconButtonVariant.Selected
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val visualContainerColor = when {
+        !enabled -> containerColor
+        else -> RouteVergePressFeedback.color(
+            base = containerColor,
+            content = resolvedContentColor,
+            pressed = pressed
+        )
+    }
 
     Box(
         modifier = modifier
+            // Keep the 48dp hit target, but do not let its rectangular
+            // indication paint outside the smaller visual circle.
             .size(RouteVergeIconButtonDefaults.TouchTarget)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .semantics {
                 if (contentDescription != null) {
                     this.contentDescription = contentDescription
@@ -83,7 +106,7 @@ fun RouteVergeIconButton(
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            color = containerColor,
+            color = visualContainerColor,
             contentColor = resolvedContentColor,
             shape = CircleShape,
             modifier = Modifier.size(visualSize)

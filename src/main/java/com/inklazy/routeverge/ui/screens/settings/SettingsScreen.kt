@@ -1,6 +1,9 @@
 package com.inklazy.routeverge.ui.screens.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
@@ -32,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -40,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.inklazy.routeverge.BuildConfig
 import com.inklazy.routeverge.R
+import com.inklazy.routeverge.ui.components.RouteVergePressFeedback
 import com.inklazy.routeverge.ui.components.RouteVergeIconButton
 import com.inklazy.routeverge.ui.components.RouteVergeIconButtonVariant
 import com.inklazy.routeverge.ui.components.RouteVergeStatus
@@ -237,16 +242,27 @@ private fun SettingRow(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     val baseModifier = Modifier
         .fillMaxWidth()
         .defaultMinSize(minHeight = 48.dp)
-        .padding(horizontal = RouteVergeSpacing.lg, vertical = RouteVergeSpacing.md)
     val clickableModifier = if (onClick != null) {
-        baseModifier.clickable(role = Role.Button, onClick = onClick)
+        baseModifier
+            .background(RouteVergePressFeedback.color(Color.Transparent, MaterialTheme.colorScheme.onSurface, pressed))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
     } else {
         baseModifier
     }
-    Row(clickableModifier, verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        clickableModifier.padding(horizontal = RouteVergeSpacing.lg, vertical = RouteVergeSpacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (subtitle != null) {

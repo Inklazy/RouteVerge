@@ -2,6 +2,8 @@ package com.inklazy.routeverge.ui.screens.route
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +60,7 @@ import com.inklazy.routeverge.data.MapProvider
 import com.inklazy.routeverge.data.RoutePoint
 import com.inklazy.routeverge.geo.RouteMath
 import com.inklazy.routeverge.ui.components.RouteVergeCard
+import com.inklazy.routeverge.ui.components.RouteVergePressFeedback
 import com.inklazy.routeverge.ui.components.RouteVergeCardVariant
 import com.inklazy.routeverge.ui.components.RouteVergeIconButton
 import com.inklazy.routeverge.ui.components.RouteVergeIconButtonDefaults
@@ -352,12 +355,18 @@ private fun RuntimeEntryChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = RouteVergePressFeedback.color(
+            MaterialTheme.colorScheme.surfaceContainerHigh,
+            MaterialTheme.colorScheme.onSurface,
+            pressed
+        ),
         shape = RouteVergeShapes.pill,
         modifier = modifier
             .clip(RouteVergeShapes.pill)
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .semantics {
                 role = Role.Button
                 contentDescription = "返回首页 · $text"

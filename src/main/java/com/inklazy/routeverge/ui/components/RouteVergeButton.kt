@@ -1,22 +1,26 @@
 package com.inklazy.routeverge.ui.components
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,25 +28,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import com.inklazy.routeverge.ui.theme.RouteVergeShapes
 import com.inklazy.routeverge.ui.theme.RouteVergeSpacing
-import com.inklazy.routeverge.ui.theme.RouteVergeMotion
-import com.inklazy.routeverge.ui.theme.rememberRouteVergeReducedMotion
 import com.inklazy.routeverge.ui.theme.RouteVergeTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * RouteVerge button — wraps Material 3 buttons with the RouteVerge look.
+ * RouteVerge button. Visible-container variants use one full-surface pressed state;
+ * text variants keep Material's native indication.
  *
  * Hierarchy (DESIGN.md §13/§14):
  *  - [RouteVergeButtonVariant.Filled] = primary action (brand primary)
@@ -89,19 +94,6 @@ fun RouteVergeButton(
     val latestOnClick by rememberUpdatedState(onClick)
     val highPriorityHaptics = hapticFeedback == RouteVergeButtonHapticFeedback.HighPriority
     var lastActionUptime by remember { mutableStateOf(0L) }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val reducedMotion = rememberRouteVergeReducedMotion()
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (pressed && enabled && !loading) 0.96f else 1f,
-        animationSpec = RouteVergeMotion.spec(reducedMotion, RouteVergeMotion.buttonPressDuration),
-        label = "button_press_scale"
-    )
-    val buttonModifier = modifier
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .defaultMinSize(minHeight = RouteVergeButtonDefaults.MinHeight)
     val content: @Composable RowScope.() -> Unit = {
         if (loading) {
             // Loading keeps the label visible: [spinner] text
@@ -142,72 +134,88 @@ fun RouteVergeButton(
             view = view
         )
     }
-    val filledContainerColor = if (pressed && interactive) {
-        RouteVergeTheme.palette.primaryPressed
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    when (variant) {
-        RouteVergeButtonVariant.Filled -> Button(
+    val buttonModifier = modifier.defaultMinSize(minHeight = RouteVergeButtonDefaults.MinHeight)
+    if (variant == RouteVergeButtonVariant.Text || variant == RouteVergeButtonVariant.DestructiveText) {
+        // Text actions have no filled visual body. Keep Material's original
+        // ripple, semantics and sizing; only filled controls need a solid layer.
+        TextButton(
             onClick = debouncedOnClick,
             modifier = buttonModifier,
             enabled = interactive,
             shape = shape ?: RouteVergeShapes.pill,
-            contentPadding = contentPadding,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = filledContainerColor,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            colors = if (variant == RouteVergeButtonVariant.DestructiveText) {
+                ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            } else {
+                ButtonDefaults.textButtonColors()
+            },
+            interactionSource = interactionSource,
+            content = content
+        )
+        return
+    }
+
+    val pressed by interactionSource.collectIsPressedAsState()
+    val resolvedShape = shape ?: if (variant == RouteVergeButtonVariant.Filled) {
+        RouteVergeShapes.pill
+    } else {
+        RouteVergeShapes.large
+    }
+    val scheme = MaterialTheme.colorScheme
+    val containerColor = when (variant) {
+        RouteVergeButtonVariant.Filled -> scheme.primary
+        RouteVergeButtonVariant.Tonal -> scheme.secondaryContainer
+        else -> scheme.background
+    }
+    val contentColor = when (variant) {
+        RouteVergeButtonVariant.Filled -> scheme.onPrimary
+        RouteVergeButtonVariant.Tonal -> scheme.onSecondaryContainer
+        else -> scheme.onBackground
+    }
+    val displayedContainer = when {
+        !interactive && variant == RouteVergeButtonVariant.Filled -> scheme.surfaceContainerHighest
+        !interactive && variant == RouteVergeButtonVariant.Tonal -> scheme.onSurface.copy(alpha = 0.12f)
+        !interactive -> containerColor
+        pressed && variant == RouteVergeButtonVariant.Filled -> RouteVergeTheme.palette.primaryPressed
+        else -> RouteVergePressFeedback.color(containerColor, contentColor, pressed)
+    }
+    val displayedContent = if (interactive) contentColor else if (variant == RouteVergeButtonVariant.Filled) {
+        scheme.onSurfaceVariant
+    } else {
+        scheme.onSurface.copy(alpha = 0.38f)
+    }
+    val border = if (variant == RouteVergeButtonVariant.Outlined) {
+        BorderStroke(1.dp, if (interactive) scheme.outline else scheme.onSurface.copy(alpha = 0.12f))
+    } else {
+        null
+    }
+
+    // The visual Surface and clickable cover exactly the same bounds. There
+    // is no Material ripple underneath the full-container pressed color.
+    Surface(
+        modifier = buttonModifier
+            .defaultMinSize(minWidth = ButtonDefaults.MinWidth)
+            .clip(resolvedShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = interactive,
+                role = Role.Button,
+                onClick = debouncedOnClick
             ),
-            interactionSource = interactionSource,
-            content = content
-        )
-
-        RouteVergeButtonVariant.Tonal -> Button(
-            onClick = debouncedOnClick,
-            modifier = buttonModifier,
-            enabled = interactive,
-            shape = shape ?: RouteVergeShapes.large,
-            contentPadding = contentPadding,
-            colors = ButtonDefaults.filledTonalButtonColors(),
-            interactionSource = interactionSource,
-            content = content
-        )
-
-        RouteVergeButtonVariant.Outlined -> OutlinedButton(
-            onClick = debouncedOnClick,
-            modifier = buttonModifier,
-            enabled = interactive,
-            shape = shape ?: RouteVergeShapes.large,
-            contentPadding = contentPadding,
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = MaterialTheme.colorScheme.background,
-                contentColor = MaterialTheme.colorScheme.onBackground
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            interactionSource = interactionSource,
-            content = content
-        )
-
-        RouteVergeButtonVariant.Text -> TextButton(
-            onClick = debouncedOnClick,
-            modifier = buttonModifier,
-            enabled = interactive,
-            interactionSource = interactionSource,
-            content = content
-        )
-
-        RouteVergeButtonVariant.DestructiveText -> TextButton(
-            onClick = debouncedOnClick,
-            modifier = buttonModifier,
-            enabled = interactive,
-            colors = ButtonDefaults.textButtonColors(
-                contentColor = MaterialTheme.colorScheme.error
-            ),
-            interactionSource = interactionSource,
-            content = content
-        )
+        shape = resolvedShape,
+        color = displayedContainer,
+        contentColor = displayedContent,
+        border = border
+    ) {
+        Row(
+            modifier = Modifier.padding(contentPadding),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ProvideTextStyle(MaterialTheme.typography.labelLarge) {
+                content()
+            }
+        }
     }
 }
 

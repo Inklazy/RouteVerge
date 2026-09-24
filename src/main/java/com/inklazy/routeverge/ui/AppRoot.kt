@@ -17,13 +17,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import com.inklazy.routeverge.data.MapProvider
 import com.inklazy.routeverge.data.RoutePoint
 import com.inklazy.routeverge.data.SavedRoute
 import com.inklazy.routeverge.data.SavedPoint
 import com.inklazy.routeverge.data.SpeedPreset
+import com.inklazy.routeverge.ui.components.RouteVergeButton
 import com.inklazy.routeverge.ui.components.RouteVergeStatus
 import com.inklazy.routeverge.ui.navigation.AppDestination
 import com.inklazy.routeverge.ui.screens.home.HomeScreen
@@ -243,7 +243,7 @@ fun AppRoot(
             title = { Text(if (pendingPointEditId == null) "保存点位" else "更新点位") },
             text = { OutlinedTextField(value = pendingPointName, onValueChange = { pendingPointName = it }, label = { Text("名称（可选）") }, singleLine = true) },
             confirmButton = {
-                Button(enabled = !savingPoint, onClick = {
+                RouteVergeButton(enabled = !savingPoint, onClick = {
                     if (!savingPoint) {
                     savingPoint = true
                     val saved = pendingPointEditId?.let { id ->

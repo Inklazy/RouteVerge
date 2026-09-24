@@ -2,6 +2,8 @@ package com.inklazy.routeverge.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,8 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -66,6 +68,8 @@ fun SavedRecordRow(
     menuContent: @Composable (dismiss: () -> Unit) -> Unit
 ) {
     var menuExpanded by remember(record.id) { mutableStateOf(false) }
+    val interactionSource = remember(record.id) { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     val reducedMotion = rememberRouteVergeReducedMotion()
     val rowColor by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background,
@@ -75,7 +79,7 @@ fun SavedRecordRow(
 
     Box(modifier = modifier.fillMaxWidth()) {
         Surface(
-            color = rowColor,
+            color = RouteVergePressFeedback.color(rowColor, MaterialTheme.colorScheme.onSurface, pressed),
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RouteVergeShapes.medium,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -83,11 +87,16 @@ fun SavedRecordRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(68.dp)
-                .clickable(onClick = onSelect)
-                .semantics {
-                    this.selected = selected
-                    this.role = Role.RadioButton
-                }
+                // The row's indication must share the same shape as the
+                // visual surface instead of painting a rectangular layer.
+                .clip(RouteVergeShapes.medium)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.RadioButton,
+                    onClick = onSelect
+                )
+                .semantics { this.selected = selected }
         ) {
             Row(
                 modifier = Modifier

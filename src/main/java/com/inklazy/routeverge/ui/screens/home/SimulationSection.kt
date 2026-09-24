@@ -2,9 +2,9 @@ package com.inklazy.routeverge.ui.screens.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,7 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -65,6 +64,7 @@ import com.inklazy.routeverge.geo.RouteMath
 import com.inklazy.routeverge.ui.components.RouteVergeButton
 import com.inklazy.routeverge.ui.components.RouteVergeButtonVariant
 import com.inklazy.routeverge.ui.components.RouteVergeButtonHapticFeedback
+import com.inklazy.routeverge.ui.components.RouteVergePressFeedback
 import com.inklazy.routeverge.ui.components.rememberModeSwitchHaptic
 import com.inklazy.routeverge.ui.components.RouteVergeTextField
 import com.inklazy.routeverge.ui.formatCoordinate
@@ -91,8 +91,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Animatable
 import com.inklazy.routeverge.ui.theme.RouteVergeMotion
 import com.inklazy.routeverge.ui.theme.rememberRouteVergeReducedMotion
@@ -286,10 +284,11 @@ private fun ModeOption(
     modifier: Modifier = Modifier
 ) {
     val reducedMotion = rememberRouteVergeReducedMotion()
-    // `selectable` otherwise obtains LocalIndication and draws a rectangular
-    // ripple over this half of the control while it is held. The moving
-    // indicator is the selector's only background layer.
+    // The moving indicator is the selector's base layer. The custom pressed
+    // overlay below is clipped to the same half-capsule so it never becomes a
+    // smaller nested rectangle or a full-width rectangular ripple.
     val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     val color by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
@@ -308,6 +307,14 @@ private fun ModeOption(
     Row(
         modifier = modifier
             .height(48.dp)
+            .clip(RouteVergeShapes.large)
+            .background(
+                RouteVergePressFeedback.color(
+                    base = Color.Transparent,
+                    content = MaterialTheme.colorScheme.onSurface,
+                    pressed = pressed
+                )
+            )
             .semantics { stateDescription = if (selected) "$label，已选中" else "$label，未选中" }
             .selectable(
                 selected = selected,
@@ -554,8 +561,10 @@ private fun SpeedPresetButton(
     val reducedMotion = rememberRouteVergeReducedMotion()
     // The preset owns its interaction target. Disable the default selectable
     // indication because it is rectangular and can bleed past the card shape.
-    // Selection is expressed solely by the animated rounded surface color.
+    // Selection and press feedback are both expressed by the same rounded
+    // surface color, so there is only one visible state layer.
     val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     val cardShape = RouteVergeShapes.medium
     val backgroundColor by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
@@ -568,13 +577,17 @@ private fun SpeedPresetButton(
         label = "speed_selection_content"
     )
     Surface(
-        color = backgroundColor,
+        color = RouteVergePressFeedback.color(
+            base = backgroundColor,
+            content = contentColor,
+            pressed = pressed
+        ),
         contentColor = contentColor,
         shape = cardShape,
         border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.outline else Color.Transparent),
         modifier = modifier
-            // Keep both the surface fill and any future interaction drawing
-            // inside the same 12dp rounded bounds.
+            // Keep the surface fill and the press color inside the same
+            // rounded bounds.
             .clip(cardShape)
             .selectable(
                 selected = selected,
@@ -645,11 +658,6 @@ private fun RuntimeSurface(
     onStop: () -> Unit
 ) {
     val reducedMotion = rememberRouteVergeReducedMotion()
-    val pauseTransition = updateTransition(isServicePaused, label = "pause_state_transition")
-    val pauseContentScale by pauseTransition.animateFloat(
-        transitionSpec = { RouteVergeMotion.spec(reducedMotion, RouteVergeMotion.contentDuration) },
-        label = "pause_content_scale"
-    ) { paused -> if (paused) 0.98f else 1f }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = com.inklazy.routeverge.ui.theme.RouteVergeShapes.medium,
@@ -709,7 +717,7 @@ private fun RuntimeSurface(
                 RouteVergeButton(onClick = onStop, hapticFeedback = RouteVergeButtonHapticFeedback.HighPriority, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard)) }, text = { Text("停止模拟") })
             } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(RouteVergeSpacing.sm), modifier = Modifier.fillMaxWidth()) {
-                    RouteVergeButton(onClick = if (isServicePaused) onResumeMock else onPause, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f).graphicsLayer { scaleX = pauseContentScale; scaleY = pauseContentScale }, leadingIcon = {
+                    RouteVergeButton(onClick = if (isServicePaused) onResumeMock else onPause, variant = RouteVergeButtonVariant.Outlined, modifier = Modifier.weight(1f), leadingIcon = {
                         AnimatedContent(targetState = isServicePaused, transitionSpec = { if (reducedMotion) fadeIn(tween(0)) togetherWith fadeOut(tween(0)) else (fadeIn(RouteVergeMotion.tweenSpec()) + scaleIn(initialScale = 0.96f)) togetherWith (fadeOut(RouteVergeMotion.tweenSpec()) + scaleOut(targetScale = 0.96f)) }, label = "pause_resume_icon") { paused ->
                             Icon(if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, contentDescription = null, modifier = Modifier.size(RouteVergeIconSizes.standard))
                         }
