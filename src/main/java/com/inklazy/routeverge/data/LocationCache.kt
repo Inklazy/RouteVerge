@@ -9,6 +9,10 @@ object LocationCache {
     private const val KEY_LAT = "lat"
     private const val KEY_LNG = "lng"
     private const val KEY_TIME = "time"
+    internal const val MAX_AGE_MILLIS = 24L * 60 * 60 * 1000
+
+    internal fun isFresh(savedAt: Long, now: Long): Boolean =
+        savedAt > 0L && savedAt <= now && now - savedAt <= MAX_AGE_MILLIS
 
     fun save(context: Context, point: RoutePoint) {
         if (!point.isValid()) return
@@ -22,13 +26,17 @@ object LocationCache {
 
     fun read(context: Context): RoutePoint? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!prefs.contains(KEY_LAT) || !prefs.contains(KEY_LNG)) {
+        if (!prefs.contains(KEY_LAT) || !prefs.contains(KEY_LNG) || !prefs.contains(KEY_TIME)) {
             return null
         }
-        val point = RoutePoint(
-            latWgs84 = longBitsToDouble(prefs.getLong(KEY_LAT, doubleToRawLongBits(0.0))),
-            lngWgs84 = longBitsToDouble(prefs.getLong(KEY_LNG, doubleToRawLongBits(0.0)))
-        )
+        val savedAt = runCatching { prefs.getLong(KEY_TIME, 0L) }.getOrNull() ?: return null
+        if (!isFresh(savedAt, System.currentTimeMillis())) return null
+        val point = runCatching {
+            RoutePoint(
+                latWgs84 = longBitsToDouble(prefs.getLong(KEY_LAT, doubleToRawLongBits(0.0))),
+                lngWgs84 = longBitsToDouble(prefs.getLong(KEY_LNG, doubleToRawLongBits(0.0)))
+            )
+        }.getOrNull() ?: return null
         return point.takeIf { it.isValid() }
     }
 

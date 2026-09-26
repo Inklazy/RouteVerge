@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -40,13 +41,27 @@ import kotlinx.coroutines.launch
 
 private const val STARTUP_AGREEMENT_PREFS_NAME = "startup_agreement_prefs"
 private const val KEY_STARTUP_AGREEMENT_ACCEPTED = "startup_agreement_accepted"
+private const val STATE_FORCE_UPDATE_VERSION_CODE = "force_update_checked_version_code"
+private const val STATE_FORCE_UPDATE_VERSION = "force_update_version"
+private const val STATE_FORCE_UPDATE_URL = "force_update_url"
+private const val STATE_FORCE_UPDATE_MESSAGE = "force_update_message"
 
-private enum class StartupPhase { CHECKING_UPDATE, UPDATE_FAILED, FORCE_UPDATE, AGREEMENT, READY }
+internal enum class StartupPhase { CHECKING_UPDATE, UPDATE_FAILED, FORCE_UPDATE, AGREEMENT, READY }
+
+/** Retained across configuration changes; process recreation starts a fresh gate check. */
+internal class StartupGateState : ViewModel() {
+    var started = false
+    val phase = mutableStateOf(StartupPhase.CHECKING_UPDATE)
+    val forceUpdateResult = mutableStateOf<AppUpdateResult?>(null)
+}
 
 /** Activity boundary only: system entry points, startup gates and Compose host. */
 class MainActivity : ComponentActivity() {
     private val viewModel: RouteVergeViewModel by lazy {
         ViewModelProvider(this)[RouteVergeViewModel::class.java]
+    }
+    private val startupGate: StartupGateState by lazy {
+        ViewModelProvider(this)[StartupGateState::class.java]
     }
     private lateinit var nfcLauncher: NfcLauncherController
 
@@ -58,8 +73,8 @@ class MainActivity : ComponentActivity() {
 
     private var nfcActivatedState = mutableStateOf(false)
     private var nfcLinkState = mutableStateOf("")
-    private var startupPhase = mutableStateOf(StartupPhase.CHECKING_UPDATE)
-    private var forceUpdateResult = mutableStateOf<AppUpdateResult?>(null)
+    private val startupPhase get() = startupGate.phase
+    private val forceUpdateResult get() = startupGate.forceUpdateResult
     private var nfcSubmittingState = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,8 +86,26 @@ class MainActivity : ComponentActivity() {
         viewModel.refresh()
         observeViewModelEvents()
 
-        startupPhase.value = if (savedInstanceState != null) StartupPhase.READY else StartupPhase.CHECKING_UPDATE
-        if (savedInstanceState == null) checkForUpdates()
+        // Retain an already checked gate across rotation. After process death,
+        // recheck unless a known force-update decision was saved for this version.
+        if (!startupGate.started) {
+            startupGate.started = true
+            val savedForceUpdate = savedInstanceState?.takeIf {
+                it.getInt(STATE_FORCE_UPDATE_VERSION_CODE, -1) == BuildConfig.VERSION_CODE
+            }?.getString(STATE_FORCE_UPDATE_VERSION)
+            if (savedForceUpdate != null) {
+                forceUpdateResult.value = AppUpdateResult(
+                    updateRequired = true,
+                    latestVersion = savedForceUpdate,
+                    releaseUrl = savedInstanceState.getString(STATE_FORCE_UPDATE_URL).orEmpty(),
+                    downloadUrl = savedInstanceState.getString(STATE_FORCE_UPDATE_URL).orEmpty(),
+                    message = savedInstanceState.getString(STATE_FORCE_UPDATE_MESSAGE).orEmpty()
+                )
+                startupPhase.value = StartupPhase.FORCE_UPDATE
+            } else {
+                checkForUpdates()
+            }
+        }
 
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -158,6 +191,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Preserve an already known force-update decision through process recovery;
+        // a failed retry must not turn it into an optional network-failure gate.
+        forceUpdateResult.value?.let { result ->
+            outState.putInt(STATE_FORCE_UPDATE_VERSION_CODE, BuildConfig.VERSION_CODE)
+            outState.putString(STATE_FORCE_UPDATE_VERSION, result.latestVersion)
+            outState.putString(STATE_FORCE_UPDATE_URL, result.downloadUrl)
+            outState.putString(STATE_FORCE_UPDATE_MESSAGE, result.message)
+        }
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refresh()
@@ -192,15 +237,17 @@ class MainActivity : ComponentActivity() {
                     if (result.updateRequired) {
                         forceUpdateResult.value = result
                         startupPhase.value = StartupPhase.FORCE_UPDATE
-                    } else if (isStartupAgreementAccepted()) {
-                        startupPhase.value = StartupPhase.READY
                     } else {
-                        startupPhase.value = StartupPhase.AGREEMENT
+                        forceUpdateResult.value = null
+                        startupPhase.value = if (isStartupAgreementAccepted()) StartupPhase.READY else StartupPhase.AGREEMENT
                     }
                 }
             } catch (e: Exception) {
                 android.util.Log.w("UpdateCheck", "update check failed", e)
-                runOnUiThread { startupPhase.value = StartupPhase.UPDATE_FAILED }
+                runOnUiThread {
+                    startupPhase.value = if (forceUpdateResult.value != null) StartupPhase.FORCE_UPDATE
+                        else StartupPhase.UPDATE_FAILED
+                }
             }
         }.start()
     }

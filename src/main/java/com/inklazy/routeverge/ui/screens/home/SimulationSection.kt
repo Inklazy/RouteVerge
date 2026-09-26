@@ -366,50 +366,63 @@ private fun MapPreview(
         Modifier.fillMaxWidth().height(height).clip(RouteVergeShapes.extraLarge)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RouteVergeShapes.extraLarge)
     ) {
-        CampusMapView(provider, Modifier.fillMaxWidth().height(height)) { c -> controller = c; c.disableUiControls() }
-        val routeProgressKey = runtimeSession?.takeIf { it.kind == RuntimeSessionKind.ROUTE }?.activeElapsedMillis
-        LaunchedEffect(controller, mode, route?.id, point?.id, lat, lng, routeProgressKey) {
+        CampusMapView(provider, Modifier.fillMaxWidth().height(height)) { c -> controller = c; lastCameraKey = null; c.disableUiControls() }
+        val activeRouteSession = runtimeSession?.takeIf {
+            it.kind == RuntimeSessionKind.ROUTE && it.routeId == route?.id
+        }
+        val routeActive = mode == SimulationMode.ROUTE && route != null &&
+            activeRouteSession?.speedMps?.let { it > 0.0 } == true
+        // Only a provider or selected geometry change rebuilds the static map layer.
+        LaunchedEffect(
+            controller, provider, mode,
+            if (mode == SimulationMode.ROUTE) route?.id else point?.id,
+            if (mode == SimulationMode.ROUTE) route?.points else null,
+            if (mode == SimulationMode.ROUTE) route?.closeLoop else null
+        ) {
             val c = controller ?: return@LaunchedEffect
-            // Let the selector commit its frame first; SDK drawing work is
-            // intentionally deferred so it cannot hold up the check icon.
             kotlinx.coroutines.yield()
-            // Coordinate edits still refresh the marker, but do not replay a
-            // zoom animation on every keystroke or mode recomposition.
-            val cameraKey = if (mode == SimulationMode.ROUTE) "route:${route?.id}" else "point:${point?.id ?: "manual"}"
-            if (mode == SimulationMode.POINT && point == null && markerHandle != null) {
-                markerHandle?.setPosition(fallback)
-                markerVisible = true
-                return@LaunchedEffect
-            }
-            c.clear()
             markerHandle = null
             markerVisible = false
+            val cameraKey = if (mode == SimulationMode.ROUTE) "$provider:route:${route?.id}" else "$provider:point:${point?.id ?: "manual"}"
             if (mode == SimulationMode.ROUTE && route != null) {
                 renderRoute(c, route.points, route.closeLoop)
-                val activeRouteSession = runtimeSession?.takeIf { it.kind == RuntimeSessionKind.ROUTE }
-                val speed = activeRouteSession?.speedMps
-                if (speed != null && speed > 0.0) {
-                    val playbackMode = if (activeRouteSession.closeLoop) PlaybackMode.LOOP else PlaybackMode.OUT_AND_BACK
-                    val current = RouteMath.interpolateRoute(
-                        points = route.points,
-                        elapsedMillis = activeRouteSession.activeElapsedMillis,
-                        speedMps = speed,
-                        playbackMode = playbackMode
-                    )
-                    c.addMarker(
-                        RoutePoint(current.latWgs84, current.lngWgs84),
-                        "当前位置",
-                        MarkerKind.CURRENT
-                    )
-                }
                 if (cameraKey != lastCameraKey) route.points.firstOrNull()?.let { c.animateCamera(it, 15f) }
             } else if (mode == SimulationMode.POINT) {
-                val p = fallback
-                markerHandle = c.addMarker(p, point?.name ?: "当前点位", MarkerKind.CURRENT)
-                if (cameraKey != lastCameraKey) c.animateCamera(p, 16f)
+                c.clear()
+                markerHandle = c.addMarker(fallback, point?.name ?: "当前点位", MarkerKind.CURRENT)
+                if (cameraKey != lastCameraKey) c.animateCamera(fallback, 16f)
+            } else {
+                c.clear()
             }
             lastCameraKey = cameraKey
             markerVisible = true
+        }
+        // Runtime ticks and manually edited coordinates only move the existing marker.
+        LaunchedEffect(controller, markerHandle, mode, route?.id, activeRouteSession, lat, lng) {
+            val c = controller ?: return@LaunchedEffect
+            if (mode == SimulationMode.ROUTE && route != null) {
+                if (!routeActive) {
+                    markerHandle?.remove()
+                    markerHandle = null
+                    return@LaunchedEffect
+                }
+                val session = activeRouteSession ?: return@LaunchedEffect
+                val speed = session.speedMps ?: return@LaunchedEffect
+                val current = RouteMath.interpolateRoute(
+                    points = route.points,
+                    elapsedMillis = session.activeElapsedMillis,
+                    speedMps = speed,
+                    playbackMode = if (session.closeLoop) PlaybackMode.LOOP else PlaybackMode.OUT_AND_BACK
+                )
+                val position = RoutePoint(current.latWgs84, current.lngWgs84)
+                if (markerHandle == null) {
+                    markerHandle = c.addMarker(position, "当前位置", MarkerKind.CURRENT)
+                } else {
+                    markerHandle?.setPosition(position)
+                }
+            } else if (mode == SimulationMode.POINT) {
+                markerHandle?.setPosition(fallback)
+            }
         }
     }
 }

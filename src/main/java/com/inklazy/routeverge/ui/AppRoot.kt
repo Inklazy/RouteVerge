@@ -92,15 +92,16 @@ fun AppRoot(
     var selectedPointId by rememberSaveable { mutableStateOf<String?>(null) }
     val pointRecordsState = rememberLazyListState()
     val routeRecordsState = rememberLazyListState()
-    var editingRoute by remember { mutableStateOf<SavedRoute?>(null) }
-    var speedText by remember { mutableStateOf(formatNumber(SpeedPreset.FAST_PACE.speedMps)) }
-    var closeLoop by remember { mutableStateOf(false) }
-    var loopCountText by remember { mutableStateOf("1") }
-    var pointLatInput by remember { mutableStateOf("39.904200") }
-    var pointLngInput by remember { mutableStateOf("116.407400") }
-    var pendingPoint by remember { mutableStateOf<RoutePoint?>(null) }
-    var pendingPointName by remember { mutableStateOf("") }
-    var pendingPointEditId by remember { mutableStateOf<String?>(null) }
+    var editingRouteId by rememberSaveable { mutableStateOf<String?>(null) }
+    val editingRoute = uiState.routes.firstOrNull { it.id == editingRouteId }
+    var speedText by rememberSaveable { mutableStateOf(formatNumber(SpeedPreset.FAST_PACE.speedMps)) }
+    var closeLoop by rememberSaveable { mutableStateOf(false) }
+    var loopCountText by rememberSaveable { mutableStateOf("1") }
+    var pointLatInput by rememberSaveable { mutableStateOf("39.904200") }
+    var pointLngInput by rememberSaveable { mutableStateOf("116.407400") }
+    var pendingPointDialogVisible by rememberSaveable { mutableStateOf(false) }
+    var pendingPointName by rememberSaveable { mutableStateOf("") }
+    var pendingPointEditId by rememberSaveable { mutableStateOf<String?>(null) }
     var savingPoint by remember { mutableStateOf(false) }
 
     BackHandler(enabled = backStack.size > 1) {
@@ -156,13 +157,13 @@ fun AppRoot(
                 },
                 onDeletePoint = onDeletePoint,
                 onOpenRouteEditor = {
-                    editingRoute = null
+                    editingRouteId = null
                     closeLoop = false
                     loopCountText = "1"
                     navigateTo(AppDestination.ROUTE_EDITOR)
                 },
                 onEditRoute = {
-                    editingRoute = it
+                    editingRouteId = it.id
                     closeLoop = it.closeLoop
                     loopCountText = it.loopCount.toString()
                     navigateTo(AppDestination.ROUTE_EDITOR)
@@ -202,7 +203,7 @@ fun AppRoot(
                 onPointPicked = { point ->
                     pointLatInput = String.format(Locale.US, "%.6f", point.latWgs84)
                     pointLngInput = String.format(Locale.US, "%.6f", point.lngWgs84)
-                    pendingPoint = point
+                    pendingPointDialogVisible = true
                     if (pendingPointEditId == null) pendingPointName = ""
                 }
             )
@@ -228,7 +229,7 @@ fun AppRoot(
                     val loopCount = loopCountText.toIntOrNull() ?: 1
                     val saved = onSaveRoute(name, points, closeLoop, loopCount)
                     if (saved != null) {
-                        editingRoute = saved
+                        editingRouteId = saved.id
                         selectedRouteId = saved.id
                         popToHome()
                     }
@@ -237,9 +238,9 @@ fun AppRoot(
         }
     }
 
-    pendingPoint?.let { _ ->
+    if (pendingPointDialogVisible) {
         AlertDialog(
-            onDismissRequest = { if (!savingPoint) { pendingPoint = null; pendingPointEditId = null } },
+            onDismissRequest = { if (!savingPoint) { pendingPointDialogVisible = false; pendingPointEditId = null } },
             title = { Text(if (pendingPointEditId == null) "保存点位" else "更新点位") },
             text = { OutlinedTextField(value = pendingPointName, onValueChange = { pendingPointName = it }, label = { Text("名称（可选）") }, singleLine = true) },
             confirmButton = {
@@ -251,14 +252,14 @@ fun AppRoot(
                     } ?: onSavePoint(pendingPointName, pointLatInput, pointLngInput)
                     savingPoint = false
                     if (saved) {
-                        pendingPoint = null
+                        pendingPointDialogVisible = false
                         pendingPointEditId = null
                         popToHome()
                     }
                     }
                 }) { Text("保存") }
             },
-            dismissButton = { TextButton(enabled = !savingPoint, onClick = { pendingPoint = null; pendingPointEditId = null }) { Text("取消") } }
+            dismissButton = { TextButton(enabled = !savingPoint, onClick = { pendingPointDialogVisible = false; pendingPointEditId = null }) { Text("取消") } }
         )
     }
 }

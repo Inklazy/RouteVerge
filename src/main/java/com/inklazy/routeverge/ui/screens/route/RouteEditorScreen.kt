@@ -28,6 +28,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,18 +75,19 @@ fun RouteEditorScreen(
     onLocateMe: () -> RoutePoint?,
     onSaveRoute: (String, List<RoutePoint>) -> Unit
 ) {
-    val points = remember(initialRoute?.id) {
-        mutableStateListOf<RoutePoint>().apply {
-            addAll(initialRoute?.points.orEmpty())
-        }
-    }
-    var pointsVersion by remember(initialRoute?.id) { mutableStateOf(0) }
-    var name by remember(initialRoute?.id) { mutableStateOf(initialRoute?.name ?: "") }
+    val points = rememberSaveable(initialRoute?.id, saver = listSaver(
+        save = { routePoints -> routePoints.flatMap { listOf(it.latWgs84, it.lngWgs84) } },
+        restore = { coords -> mutableStateListOf<RoutePoint>().apply {
+            coords.chunked(2).forEach { add(RoutePoint(it[0], it[1])) }
+        } }
+    )) { mutableStateListOf<RoutePoint>().apply { addAll(initialRoute?.points.orEmpty()) } }
+    var pointsVersion by rememberSaveable(initialRoute?.id) { mutableStateOf(0) }
+    var name by rememberSaveable(initialRoute?.id) { mutableStateOf(initialRoute?.name ?: "") }
     var showSaveDialog by remember { mutableStateOf(false) }
     var showNameError by remember { mutableStateOf(false) }
     var showLoopSheet by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
-    var drawMode by remember { mutableStateOf(false) }
+    var drawMode by rememberSaveable { mutableStateOf(false) }
     var templateEnabled by remember(initialRoute?.id) { mutableStateOf(false) }
     var templateCenter by remember(initialRoute?.id) { mutableStateOf<RoutePoint?>(null) }
     var templateLength by remember(initialRoute?.id) { mutableStateOf(160.0) }
@@ -266,7 +269,7 @@ private fun LoopSettingsSheet(
     ) {
         // Local editing state: only valid values (>= 1) propagate to the app
         // state, so the shown value always equals what gets saved.
-        var localCount by remember { mutableStateOf(loopCountText) }
+        var localCount by rememberSaveable { mutableStateOf(loopCountText) }
         val parsedCount = localCount.trim().toIntOrNull()
         val countValid = parsedCount != null && parsedCount >= 1
 

@@ -89,7 +89,7 @@ class NfcLauncherController(
         if (!ensureActivated()) return
 
         val url = getSavedOrDefaultUrl()
-        if (!hasUsableScheme(url)) {
+        if (!TrustedNfcUrl.accepts(url)) {
             toast("链接无效")
             return
         }
@@ -117,7 +117,7 @@ class NfcLauncherController(
             toast("已恢复默认链接")
             return
         }
-        if (!hasUsableScheme(trimmed)) {
+        if (!TrustedNfcUrl.accepts(trimmed)) {
             toast("链接无效")
             return
         }
@@ -183,24 +183,10 @@ class NfcLauncherController(
     }
 
     private fun extractAlipayUrl(message: NdefMessage): String? {
-        var hasAlipayAar = false
-        var firstUrl: String? = null
-
-        message.records.forEach { record ->
-            if (isAlipayAar(record)) {
-                hasAlipayAar = true
-            } else if (firstUrl == null) {
-                firstUrl = record.toUri()?.toString()
-            }
-        }
-
-        val url = firstUrl ?: return null
-        if (!isAcceptedNfcUrl(url)) return null
-        return if (hasAlipayAar || url.contains("render.alipay.com") || url.startsWith("alipay://")) {
-            url
-        } else {
-            null
-        }
+        return message.records.asSequence()
+            .filterNot(::isAlipayAar)
+            .mapNotNull { it.toUri()?.toString() }
+            .firstOrNull(TrustedNfcUrl::accepts)
     }
 
     private fun isAlipayAar(record: NdefRecord): Boolean {
@@ -236,7 +222,11 @@ class NfcLauncherController(
     }
 
     fun saveDiscoveredUrl(url: String) {
-        prefs.edit().putString(KEY_NFC_URL, url).apply()
+        if (!TrustedNfcUrl.accepts(url)) {
+            toast("链接无效")
+            return
+        }
+        prefs.edit().putString(KEY_NFC_URL, url.trim()).apply()
         onStateChanged()
         toast("新链接已保存")
     }
@@ -390,23 +380,27 @@ class NfcLauncherController(
 
     private fun postJson(path: String, body: JSONObject): JSONObject {
         val connection = URL(resolveApiUrl(path)).openConnection() as HttpURLConnection
-        connection.connectTimeout = NETWORK_TIMEOUT_MS
-        connection.readTimeout = NETWORK_TIMEOUT_MS
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        connection.setRequestProperty("Accept", "application/json")
-        connection.doOutput = true
+        try {
+            connection.connectTimeout = NETWORK_TIMEOUT_MS
+            connection.readTimeout = NETWORK_TIMEOUT_MS
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.doOutput = true
 
-        val payload = body.toString().toByteArray(StandardCharsets.UTF_8)
-        connection.outputStream.use { output: OutputStream -> output.write(payload) }
+            val payload = body.toString().toByteArray(StandardCharsets.UTF_8)
+            connection.outputStream.use { output: OutputStream -> output.write(payload) }
 
-        val status = connection.responseCode
-        val text = readStream(if (status in 200..399) connection.inputStream else connection.errorStream)
-        if (text.isBlank()) {
-            throw IOException("HTTP $status")
-        }
-        return JSONObject(text).also {
-            if (status !in 200..399) it.put("httpStatus", status)
+            val status = connection.responseCode
+            val text = readStream(if (status in 200..399) connection.inputStream else connection.errorStream)
+            if (text.isBlank()) {
+                throw IOException("HTTP $status")
+            }
+            return JSONObject(text).also {
+                if (status !in 200..399) it.put("httpStatus", status)
+            }
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -459,21 +453,6 @@ class NfcLauncherController(
 
     private fun getSavedOrDefaultUrl(): String {
         return prefs.getString(KEY_NFC_URL, "").orEmpty().trim().ifEmpty { DEFAULT_NFC_URL }
-    }
-
-    private fun hasUsableScheme(url: String): Boolean {
-        return Uri.parse(url).scheme?.isNotBlank() == true
-    }
-
-    private fun isAcceptedNfcUrl(url: String): Boolean {
-        if (!hasUsableScheme(url)) return false
-        val uri = Uri.parse(url)
-        val scheme = uri.scheme.orEmpty()
-        if (scheme.equals("alipay", ignoreCase = true)) return true
-        val host = uri.host
-        return (scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)) &&
-                host != null &&
-                host.endsWith("alipay.com")
     }
 
     private fun showThrottledToast(message: String) {

@@ -52,6 +52,8 @@ object RouteMath {
         }
 
         val traveled = speedMps * elapsedMillis / 1000.0
+        val isReturning = playbackMode == PlaybackMode.OUT_AND_BACK &&
+                positiveModulo(traveled, routeDistance * 2) > routeDistance
         val distanceOnPath = when (playbackMode) {
             PlaybackMode.LOOP -> {
                 val closingDistance = distanceMeters(points.last(), points.first())
@@ -67,14 +69,15 @@ object RouteMath {
 
         val effectivePoints = if (playbackMode == PlaybackMode.LOOP) points + points.first() else points
         val (from, to, segmentOffset) = locateSegment(effectivePoints, distanceOnPath)
-        val bearing = bearingDegrees(from, to)
-        val interpolated = moveAlong(from, bearing, segmentOffset)
+        val interpolationBearing = bearingDegrees(from, to)
+        val interpolated = moveAlong(from, interpolationBearing, segmentOffset)
+        val reportedBearing = if (isReturning) bearingDegrees(to, from) else interpolationBearing
 
         return SimulatedLocation(
             latWgs84 = interpolated.latWgs84,
             lngWgs84 = interpolated.lngWgs84,
             speedMps = speedMps.toFloat(),
-            bearing = bearing.toFloat(),
+            bearing = reportedBearing.toFloat(),
             accuracyMeters = 5f,
             altitudeMeters = 10.0
         )

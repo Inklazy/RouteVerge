@@ -41,6 +41,7 @@ enum class MarkerKind { START, END, CURRENT, NORMAL, CLOSED_ORIGIN }
 interface MapMarkerHandle {
     fun setPosition(point: RoutePoint)
     fun setAlpha(alpha: Float)
+    fun remove()
 }
 
 interface MapController {
@@ -191,6 +192,7 @@ private class AMapController(private val map: AMap) : MapController {
             }
 
             override fun setAlpha(alpha: Float) { marker?.alpha = alpha }
+            override fun remove() { marker?.remove() }
         }
     }
 
@@ -272,6 +274,7 @@ private class GoogleController(private val map: GoogleMap) : MapController {
             }
 
             override fun setAlpha(alpha: Float) { marker?.alpha = alpha }
+            override fun remove() { marker?.remove() }
         }
     }
 

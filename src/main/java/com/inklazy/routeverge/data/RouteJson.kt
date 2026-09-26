@@ -10,6 +10,7 @@ object RouteJson {
             array.put(JSONObject().apply {
                 put("id", route.id)
                 put("name", route.name)
+                put("speedMps", route.speedMps)
                 put("closeLoop", route.closeLoop)
                 put("loopCount", route.loopCount)
                 put("points", JSONArray().apply {
