@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
@@ -32,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -41,6 +47,7 @@ import android.view.HapticFeedbackConstants
 import com.inklazy.routeverge.ui.theme.RouteVergeShapes
 import com.inklazy.routeverge.ui.theme.RouteVergeSpacing
 import com.inklazy.routeverge.ui.theme.RouteVergeTheme
+import com.inklazy.routeverge.ui.theme.rememberRouteVergeReducedMotion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -155,6 +162,50 @@ fun RouteVergeButton(
     }
 
     val pressed by interactionSource.collectIsPressedAsState()
+    val buttonScale = remember { Animatable(1f) }
+    val reducedMotion = rememberRouteVergeReducedMotion()
+    LaunchedEffect(interactionSource, interactive, reducedMotion) {
+        if (!interactive) {
+            buttonScale.snapTo(1f)
+            return@LaunchedEffect
+        }
+        var scaleJob: Job? = null
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> {
+                    scaleJob?.cancel()
+                    scaleJob = launch {
+                        if (reducedMotion) buttonScale.snapTo(PRESSED_BUTTON_SCALE)
+                        else buttonScale.animateTo(
+                            PRESSED_BUTTON_SCALE,
+                            animationSpec = tween(
+                                durationMillis = BUTTON_PRESS_SCALE_DURATION_MILLIS,
+                                easing = FastOutSlowInEasing
+                            )
+                        )
+                    }
+                }
+                is PressInteraction.Release, is PressInteraction.Cancel -> {
+                    scaleJob?.cancel()
+                    scaleJob = launch {
+                        // A brief tap may end before the press tween has drawn a frame.
+                        // Still show the full pressed scale before springing back.
+                        if (reducedMotion) buttonScale.snapTo(1f)
+                        else {
+                            buttonScale.snapTo(PRESSED_BUTTON_SCALE)
+                            buttonScale.animateTo(
+                                1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
     val resolvedShape = shape ?: if (variant == RouteVergeButtonVariant.Filled) {
         RouteVergeShapes.pill
     } else {
@@ -194,6 +245,8 @@ fun RouteVergeButton(
     Surface(
         modifier = buttonModifier
             .defaultMinSize(minWidth = ButtonDefaults.MinWidth)
+            // A graphics layer scales the whole Surface without changing its layout bounds.
+            .graphicsLayer { scaleX = buttonScale.value; scaleY = buttonScale.value }
             .clip(resolvedShape)
             .clickable(
                 interactionSource = interactionSource,
@@ -285,6 +338,8 @@ private fun HighPriorityButtonHaptics(
     }
 }
 
+private const val PRESSED_BUTTON_SCALE = 0.985f
+private const val BUTTON_PRESS_SCALE_DURATION_MILLIS = 90
 private const val LONG_PRESS_THRESHOLD_MILLIS = 250L
 private const val RAPID_ACTION_GUARD_MILLIS = 350L
 private const val RAPID_HAPTIC_GUARD_MILLIS = 150L

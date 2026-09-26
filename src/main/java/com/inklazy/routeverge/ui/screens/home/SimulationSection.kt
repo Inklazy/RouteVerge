@@ -284,11 +284,8 @@ private fun ModeOption(
     modifier: Modifier = Modifier
 ) {
     val reducedMotion = rememberRouteVergeReducedMotion()
-    // The moving indicator is the selector's base layer. The custom pressed
-    // overlay below is clipped to the same half-capsule so it never becomes a
-    // smaller nested rectangle or a full-width rectangular ripple.
+    // Only selection changes the visuals; touch, hover and focus have no state layer.
     val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
     val color by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
@@ -308,13 +305,6 @@ private fun ModeOption(
         modifier = modifier
             .height(48.dp)
             .clip(RouteVergeShapes.large)
-            .background(
-                RouteVergePressFeedback.color(
-                    base = Color.Transparent,
-                    content = MaterialTheme.colorScheme.onSurface,
-                    pressed = pressed
-                )
-            )
             .semantics { stateDescription = if (selected) "$label，已选中" else "$label，未选中" }
             .selectable(
                 selected = selected,
