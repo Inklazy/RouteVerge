@@ -53,7 +53,7 @@ private fun RouteVergeStatus.vividColor(): Color = when (this) {
 @Composable
 @ReadOnlyComposable
 private fun RouteVergeStatus.containerColor(): Color = when (this) {
-    RouteVergeStatus.Ready, RouteVergeStatus.Completed -> RouteVergeTheme.statusColors.successContainer
+    RouteVergeStatus.Ready, RouteVergeStatus.Completed -> MaterialTheme.colorScheme.surfaceContainer
     RouteVergeStatus.Running -> MaterialTheme.colorScheme.primaryContainer
     RouteVergeStatus.Paused, RouteVergeStatus.Warning -> RouteVergeTheme.statusColors.warningContainer
     RouteVergeStatus.Error -> RouteVergeTheme.statusColors.dangerContainer
@@ -64,7 +64,7 @@ private fun RouteVergeStatus.containerColor(): Color = when (this) {
 @Composable
 @ReadOnlyComposable
 private fun RouteVergeStatus.onContainerColor(): Color = when (this) {
-    RouteVergeStatus.Ready, RouteVergeStatus.Completed -> RouteVergeTheme.statusColors.onSuccessContainer
+    RouteVergeStatus.Ready, RouteVergeStatus.Completed -> MaterialTheme.colorScheme.onSurface
     RouteVergeStatus.Running -> MaterialTheme.colorScheme.onPrimaryContainer
     RouteVergeStatus.Paused, RouteVergeStatus.Warning -> RouteVergeTheme.statusColors.onWarningContainer
     RouteVergeStatus.Error -> RouteVergeTheme.statusColors.onDangerContainer

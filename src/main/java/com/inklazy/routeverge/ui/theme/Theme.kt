@@ -16,6 +16,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * RouteVerge Design System — Phase 2.
@@ -97,12 +98,12 @@ data class RouteVergePalette(
     val onPrimary: Color,
     val primaryContainer: Color,
     val onPrimaryContainer: Color,
-    // Secondary warm neutrals (NOT status colors)
+    // Secondary neutrals (NOT status colors)
     val secondary: Color,
     val onSecondary: Color,
     val secondaryContainer: Color,
     val onSecondaryContainer: Color,
-    // Tertiary warm neutral, reserved for future accents
+    // Tertiary neutral, reserved for future accents
     val tertiary: Color,
     val onTertiary: Color,
     val tertiaryContainer: Color,
@@ -132,6 +133,7 @@ data class RouteVergePalette(
     // Inverse
     val inverseSurface: Color,
     val inverseOnSurface: Color,
+    val modeSelected: Color,
     val inversePrimary: Color,
     // No M3 role
     val textDisabled: Color               // DESIGN.md "Disabled Text"
@@ -141,37 +143,39 @@ val RouteVergeLightPalette = RouteVergePalette(
     primary = Color(0xFFCC785C),
     primaryPressed = Color(0xFFA9583E),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE8E0D2),
-    onPrimaryContainer = Color(0xFF141413),
-    secondary = Color(0xFF6C6A64),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFEFE9DE),
-    onSecondaryContainer = Color(0xFF3D3D3A),
-    tertiary = Color(0xFF8E8B82),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFE8E0D2),
-    onTertiaryContainer = Color(0xFF3D3D3A),
-    background = Color(0xFFFAF9F5),
-    onBackground = Color(0xFF141413),
-    surface = Color(0xFFFAF9F5),
-    onSurface = Color(0xFF141413),
-    surfaceContainerLowest = Color(0xFFFAF9F5),
-    surfaceContainerLow = Color(0xFFF5F0E8),
-    surfaceContainer = Color(0xFFEFE9DE),
-    surfaceContainerHigh = Color(0xFFE8E0D2),
-    surfaceContainerHighest = Color(0xFFE6DFD8),
-    surfaceVariant = Color(0xFFF5F0E8),
-    onSurfaceVariant = Color(0xFF6C6A64),
-    surfaceBright = Color(0xFFFAF9F5),
-    surfaceDim = Color(0xFFE6DFD8),
-    outline = Color(0xFFE6DFD8),
-    outlineVariant = Color(0xFFEBE6DF),
+    primaryContainer = Color(0xFFF0EFEB),
+    onPrimaryContainer = Color(0xFF383934),
+    secondary = Color(0xFF7A7974),
+    onSecondary = Color(0xFFFEFEFE),
+    secondaryContainer = Color(0xFFF0EFEB),
+    onSecondaryContainer = Color(0xFF383934),
+    tertiary = Color(0xFF7A7974),
+    onTertiary = Color(0xFFFEFEFE),
+    tertiaryContainer = Color(0xFFF0EFEB),
+    onTertiaryContainer = Color(0xFF383934),
+    // Sampled from the supplied Claude home screenshot: canvas / composer / chips / ink.
+    background = Color(0xFFF9F9F7),
+    onBackground = Color(0xFF131313),
+    surface = Color(0xFFFEFEFE),
+    onSurface = Color(0xFF383934),
+    surfaceContainerLowest = Color(0xFFFEFEFE),
+    surfaceContainerLow = Color(0xFFF0EFEB),
+    surfaceContainer = Color(0xFFF0EFEB),
+    surfaceContainerHigh = Color(0xFFF0EFEB),
+    surfaceContainerHighest = Color(0xFFF0EFEB),
+    surfaceVariant = Color(0xFFF0EFEB),
+    onSurfaceVariant = Color(0xFF7A7974),
+    surfaceBright = Color(0xFFFEFEFE),
+    surfaceDim = Color(0xFFF0EFEB),
+    outline = Color(0xFFDCDCDC),
+    outlineVariant = Color(0xFFF0EFEB),
     error = Color(0xFFC64545),
-    onError = Color(0xFFFFFFFF),
+    onError = Color(0xFFFEFEFE),
     errorContainer = Color(0xFFF5D8D2),
     onErrorContainer = Color(0xFF5A1B18),
-    inverseSurface = Color(0xFF181715),
-    inverseOnSurface = Color(0xFFFAF9F5),
+    inverseSurface = Color(0xFF1D1D1B),
+    inverseOnSurface = Color(0xFFFEFEFE),
+    modeSelected = Color(0xFF222222),
     inversePrimary = Color(0xFFE6A28A),
     textDisabled = Color(0xFF8E8B82)
 )
@@ -191,9 +195,9 @@ val RouteVergeDarkPalette = RouteVergePalette(
     tertiaryContainer = Color(0xFF3B3832),
     onTertiaryContainer = Color(0xFFE8E0D2),
     background = Color(0xFF181715),
-    onBackground = Color(0xFFFAF9F5),
+    onBackground = Color(0xFFF9F9F7),
     surface = Color(0xFF1F1E1B),
-    onSurface = Color(0xFFFAF9F5),
+    onSurface = Color(0xFFF9F9F7),
     surfaceContainerLowest = Color(0xFF181715),
     surfaceContainerLow = Color(0xFF1F1E1B),
     surfaceContainer = Color(0xFF252320),
@@ -209,8 +213,9 @@ val RouteVergeDarkPalette = RouteVergePalette(
     onError = Color(0xFF3D0908),
     errorContainer = Color(0xFF64221E),
     onErrorContainer = Color(0xFFF5D8D2),
-    inverseSurface = Color(0xFFFAF9F5),
+    inverseSurface = Color(0xFFF9F9F7),
     inverseOnSurface = Color(0xFF181715),
+    modeSelected = Color(0xFFF9F9F7),
     inversePrimary = Color(0xFF9F5540),
     textDisabled = Color(0xFF8E8B82)
 )
@@ -286,12 +291,12 @@ object RouteVergeTheme {
 private val RouteVergeTypography: Typography = run {
     val base = Typography()
     base.copy(
-        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-        labelMedium = base.labelMedium.copy(fontWeight = FontWeight.Medium),
-        labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Medium)
+        titleLarge = base.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Normal, letterSpacing = (-0.3).sp),
+        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.Medium),
+        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.Medium),
+        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.Medium),
+        labelMedium = base.labelMedium.copy(fontWeight = FontWeight.Normal),
+        labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Normal)
     )
 }
 

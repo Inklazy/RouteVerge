@@ -60,7 +60,7 @@ fun RouteVergeTextField(
         keyboardOptions = keyboardOptions,
         shape = RouteVergeShapes.medium,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
             unfocusedBorderColor = Color.Transparent,
             disabledBorderColor = Color.Transparent,
             errorBorderColor = MaterialTheme.colorScheme.error,
@@ -68,7 +68,7 @@ fun RouteVergeTextField(
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             errorContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = MaterialTheme.colorScheme.onSurface,
             unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
             disabledLabelColor = RouteVergeTheme.palette.textDisabled,
             errorLabelColor = MaterialTheme.colorScheme.error,

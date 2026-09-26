@@ -46,7 +46,6 @@ import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import com.inklazy.routeverge.ui.theme.RouteVergeShapes
 import com.inklazy.routeverge.ui.theme.RouteVergeSpacing
-import com.inklazy.routeverge.ui.theme.RouteVergeTheme
 import com.inklazy.routeverge.ui.theme.rememberRouteVergeReducedMotion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -57,7 +56,7 @@ import kotlinx.coroutines.launch
  * text variants keep Material's native indication.
  *
  * Hierarchy (DESIGN.md §13/§14):
- *  - [RouteVergeButtonVariant.Filled] = primary action (brand primary)
+ *  - [RouteVergeButtonVariant.Filled] = primary action (inverse ink surface)
  *  - [RouteVergeButtonVariant.Tonal]  = important secondary
  *  - [RouteVergeButtonVariant.Outlined] = secondary alternative
  *  - [RouteVergeButtonVariant.Text]   = low priority
@@ -213,12 +212,12 @@ fun RouteVergeButton(
     }
     val scheme = MaterialTheme.colorScheme
     val containerColor = when (variant) {
-        RouteVergeButtonVariant.Filled -> scheme.primary
+        RouteVergeButtonVariant.Filled -> scheme.inverseSurface
         RouteVergeButtonVariant.Tonal -> scheme.secondaryContainer
         else -> scheme.background
     }
     val contentColor = when (variant) {
-        RouteVergeButtonVariant.Filled -> scheme.onPrimary
+        RouteVergeButtonVariant.Filled -> scheme.inverseOnSurface
         RouteVergeButtonVariant.Tonal -> scheme.onSecondaryContainer
         else -> scheme.onBackground
     }
@@ -226,7 +225,6 @@ fun RouteVergeButton(
         !interactive && variant == RouteVergeButtonVariant.Filled -> scheme.surfaceContainerHighest
         !interactive && variant == RouteVergeButtonVariant.Tonal -> scheme.onSurface.copy(alpha = 0.12f)
         !interactive -> containerColor
-        pressed && variant == RouteVergeButtonVariant.Filled -> RouteVergeTheme.palette.primaryPressed
         else -> RouteVergePressFeedback.color(containerColor, contentColor, pressed)
     }
     val displayedContent = if (interactive) contentColor else if (variant == RouteVergeButtonVariant.Filled) {

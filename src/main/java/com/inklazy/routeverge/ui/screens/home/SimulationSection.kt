@@ -73,6 +73,7 @@ import com.inklazy.routeverge.ui.formatNumber
 import com.inklazy.routeverge.ui.routeDisplayName
 import com.inklazy.routeverge.ui.theme.RouteVergeShapes
 import com.inklazy.routeverge.ui.theme.RouteVergeSpacing
+import com.inklazy.routeverge.ui.theme.RouteVergeTheme
 import com.inklazy.routeverge.ui.theme.RouteVergeIconSizes
 import com.inklazy.routeverge.ui.map.CampusMapView
 import com.inklazy.routeverge.ui.map.MapController
@@ -264,9 +265,9 @@ private fun ModeSelector(
                     .fillMaxHeight()
                     .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
                     .clip(RouteVergeShapes.large)
-                    // Selection is communicated by this single moving color
-                    // block only; no child elevation/shadow can form a seam.
-                    .background(Color(0xFFD8CDBB))
+                    // The moving ink capsule alone expresses selection; no child
+                    // elevation or shadow forms an extra seam.
+                    .background(RouteVergeTheme.palette.modeSelected)
             )
             Row(modifier = Modifier.fillMaxWidth()) {
                 ModeOption("定点", mode == SimulationMode.POINT, { selectMode(SimulationMode.POINT) }, Modifier.weight(1f))
@@ -287,7 +288,7 @@ private fun ModeOption(
     // Only selection changes the visuals; touch, hover and focus have no state layer.
     val interactionSource = remember { MutableInteractionSource() }
     val color by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (selected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
         label = "mode_selector_text_color"
     )
@@ -570,12 +571,12 @@ private fun SpeedPresetButton(
     val pressed by interactionSource.collectIsPressedAsState()
     val cardShape = RouteVergeShapes.medium
     val backgroundColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        targetValue = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainer,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
         label = "speed_selection_color"
     )
     val contentColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        targetValue = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface,
         animationSpec = RouteVergeMotion.spec(reducedMotion),
         label = "speed_selection_content"
     )
